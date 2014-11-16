@@ -168,7 +168,7 @@ bool *BKE_objdef_vgroup_subset_from_select_type(
         Object *ob, eVGroupSelect subset_type, int *r_vgroup_tot, int *r_subset_count)
 {
 	bool *vgroup_validmap = NULL;
-	*r_vgroup_tot = BLI_countlist(&ob->defbase);
+	*r_vgroup_tot = BLI_listbase_count(&ob->defbase);
 
 	switch (subset_type) {
 		case WT_VGROUP_ACTIVE:

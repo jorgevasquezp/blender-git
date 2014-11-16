@@ -1122,7 +1122,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 
 	switch (tolayers) {
 		case DT_TOLAYERS_INDEX:
-			idx_dst = BLI_countlist(&ob_dst->defbase);
+			idx_dst = BLI_listbase_count(&ob_dst->defbase);
 
 			/* Find last source actually used! */
 			idx_src = num_layers_src;
@@ -1136,7 +1136,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 				/* Create as much vgroups as necessary! */
 				for (; idx_dst < idx_src; idx_dst++) {
 					BKE_defgroup_new(ob_dst, DATA_("Group"));
-					ob_dst->actdef = BLI_countlist(&ob_dst->defbase);
+					ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
 				}
 			}
 			while (idx_src--) {
@@ -1162,7 +1162,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 							return false;
 						}
 						BKE_defgroup_new(ob_dst, dg_src->name);
-						ob_dst->actdef = BLI_countlist(&ob_dst->defbase);
+						ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
 						idx_dst = ob_dst->actdef - 1;
 					}
 					data_transfer_layersmapping_add_item(r_map, CD_FAKE_MDEFORMVERT, mix_mode, mix_factor, mix_weights,
@@ -1221,7 +1221,7 @@ bool data_transfer_layersmapping_vgroups(
 	if (fromlayers == DT_FROMLAYERS_ACTIVE || fromlayers >= 0) {
 		if (fromlayers >= 0) {
 			idx_src = fromlayers;
-			BLI_assert(idx_src < BLI_countlist(&ob_src->defbase));
+			BLI_assert(idx_src < BLI_listbase_count(&ob_src->defbase));
 		}
 		else {
 			if ((idx_src = ob_src->actdef - 1) == -1){
@@ -1231,7 +1231,7 @@ bool data_transfer_layersmapping_vgroups(
 
 		if (tolayers >= 0) {
 			idx_dst = tolayers;
-			BLI_assert(idx_dst < BLI_countlist(&ob_dst->defbase));
+			BLI_assert(idx_dst < BLI_listbase_count(&ob_dst->defbase));
 		}
 		else if (tolayers == DT_TOLAYERS_ACTIVE) {
 			if ((idx_dst = ob_dst->actdef - 1) == -1) {
@@ -1241,12 +1241,12 @@ bool data_transfer_layersmapping_vgroups(
 				}
 				dg_src = BLI_findlink(&ob_src->defbase, idx_src);
 				BKE_defgroup_new(ob_dst, dg_src->name);
-				ob_dst->actdef = BLI_countlist(&ob_dst->defbase);
+				ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
 				idx_dst = ob_dst->actdef - 1;
 			}
 		}
 		else if (tolayers == DT_TOLAYERS_INDEX) {
-			int num = BLI_countlist(&ob_src->defbase);
+			int num = BLI_listbase_count(&ob_src->defbase);
 			idx_dst = idx_src;
 			if (num <= idx_dst) {
 				if (!num_create) {
@@ -1255,7 +1255,7 @@ bool data_transfer_layersmapping_vgroups(
 				/* Create as much vgroups as necessary! */
 				for (; num <= idx_dst; num++) {
 					BKE_defgroup_new(ob_dst, DATA_("Group"));
-					ob_dst->actdef = BLI_countlist(&ob_dst->defbase);
+					ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
 				}
 			}
 		}
@@ -1266,7 +1266,7 @@ bool data_transfer_layersmapping_vgroups(
 					return false;
 				}
 				BKE_defgroup_new(ob_dst, dg_src->name);
-				ob_dst->actdef = BLI_countlist(&ob_dst->defbase);
+				ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
 				idx_dst = ob_dst->actdef - 1;
 			}
 		}
