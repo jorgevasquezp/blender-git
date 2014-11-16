@@ -812,7 +812,14 @@ bool BKE_data_transfer_dm(
 
 	/* Get source DM.*/
 	dm_src_mask |= BKE_data_transfer_dttypes_to_cdmask(data_types);
-	dm_src = mesh_get_derived_final(scene, ob_src, dm_src_mask);
+	/* XXX Hack! In case this is being evaluated from dm stack, we cannot compute final dm,
+	 *     can lead to infinite recursion in case of dependency cycles of DataTransfer modifiers...
+	 *     Issue is, this means we cannot be sure to have requested cd layers in source.
+	 */
+	dm_src = dm_dst ? ob_src->derivedFinal : mesh_get_derived_final(scene, ob_src, dm_src_mask);
+	if (!dm_src) {
+		return changed;
+	}
 
 	/* Check all possible data types.
 	 * Note item mappings and dest mix weights are cached. */
