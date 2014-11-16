@@ -145,7 +145,7 @@ bDeformGroup *ED_vgroup_add_name(Object *ob, const char *name)
 
 	defgroup = BKE_defgroup_new(ob, name);
 
-	ob->actdef = BLI_countlist(&ob->defbase);
+	ob->actdef = BLI_listbase_count(&ob->defbase);
 
 	return defgroup;
 }
@@ -501,8 +501,8 @@ bool ED_vgroup_array_copy(Object *ob, Object *ob_from)
 	int dvert_tot_from;
 	int dvert_tot;
 	int i;
-	int defbase_tot_from = BLI_countlist(&ob_from->defbase);
-	int defbase_tot = BLI_countlist(&ob->defbase);
+	int defbase_tot_from = BLI_listbase_count(&ob_from->defbase);
+	int defbase_tot = BLI_listbase_count(&ob->defbase);
 	bool new_vgroup = false;
 
 	if (ob == ob_from)
@@ -1476,7 +1476,7 @@ static void vgroup_duplicate(Object *ob)
 	BLI_addtail(&ob->defbase, cdg);
 
 	idg = (ob->actdef - 1);
-	ob->actdef = BLI_countlist(&ob->defbase);
+	ob->actdef = BLI_listbase_count(&ob->defbase);
 	icdg = (ob->actdef - 1);
 
 	/* TODO, we might want to allow only copy selected verts here? - campbell */
@@ -1495,6 +1495,86 @@ static void vgroup_duplicate(Object *ob)
 		}
 
 		MEM_freeN(dvert_array);
+	}
+}
+
+/**
+ * Return the subset type of the Vertex Group Selection
+ */
+bool *ED_vgroup_subset_from_select_type(Object *ob, eVGroupSelect subset_type, int *r_vgroup_tot, int *r_subset_count)
+{
+	bool *vgroup_validmap = NULL;
+	*r_vgroup_tot = BLI_listbase_count(&ob->defbase);
+
+	switch (subset_type) {
+		case WT_VGROUP_ACTIVE:
+		{
+			const int def_nr_active = ob->actdef - 1;
+			vgroup_validmap = MEM_mallocN(*r_vgroup_tot * sizeof(*vgroup_validmap), __func__);
+			memset(vgroup_validmap, false, *r_vgroup_tot * sizeof(*vgroup_validmap));
+			if ((def_nr_active >= 0) && (def_nr_active < *r_vgroup_tot)) {
+				*r_subset_count = 1;
+				vgroup_validmap[def_nr_active] = true;
+			}
+			else {
+				*r_subset_count = 0;
+			}
+			break;
+		}
+		case WT_VGROUP_BONE_SELECT:
+		{
+			vgroup_validmap = BKE_objdef_selected_get(ob, *r_vgroup_tot, r_subset_count);
+			break;
+		}
+		case WT_VGROUP_BONE_DEFORM:
+		{
+			int i;
+			vgroup_validmap = BKE_objdef_validmap_get(ob, *r_vgroup_tot);
+			*r_subset_count = 0;
+			for (i = 0; i < *r_vgroup_tot; i++) {
+				if (vgroup_validmap[i] == true) {
+					*r_subset_count += 1;
+				}
+			}
+			break;
+		}
+		case WT_VGROUP_BONE_DEFORM_OFF:
+		{
+			int i;
+			vgroup_validmap = BKE_objdef_validmap_get(ob, *r_vgroup_tot);
+			*r_subset_count = 0;
+			for (i = 0; i < *r_vgroup_tot; i++) {
+				vgroup_validmap[i] = !vgroup_validmap[i];
+				if (vgroup_validmap[i] == true) {
+					*r_subset_count += 1;
+				}
+			}
+			break;
+		}
+		case WT_VGROUP_ALL:
+		default:
+		{
+			vgroup_validmap = MEM_mallocN(*r_vgroup_tot * sizeof(*vgroup_validmap), __func__);
+			memset(vgroup_validmap, true, *r_vgroup_tot * sizeof(*vgroup_validmap));
+			*r_subset_count = *r_vgroup_tot;
+			break;
+		}
+	}
+
+	return vgroup_validmap;
+}
+
+/**
+ * store indices from the vgroup_validmap (faster lookups in some cases)
+ */
+void ED_vgroup_subset_to_index_array(const bool *vgroup_validmap, const int vgroup_tot,
+                                     int *r_vgroup_subset_map)
+{
+	int i, j = 0;
+	for (i = 0; i < vgroup_tot; i++) {
+		if (vgroup_validmap[i]) {
+			r_vgroup_subset_map[j++] = i;
+		}
 	}
 }
 
@@ -1971,7 +2051,7 @@ static void vgroup_normalize_all(Object *ob,
 	ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
 	if (dvert_array) {
-		const int defbase_tot = BLI_countlist(&ob->defbase);
+		const int defbase_tot = BLI_listbase_count(&ob->defbase);
 		bool *lock_flags = BKE_objdef_lock_flags_get(ob, defbase_tot);
 
 		if ((lock_active == true) &&
@@ -2686,7 +2766,7 @@ static void vgroup_remap_update_users(Object *ob, int *map)
 
 static void vgroup_delete_update_users(Object *ob, int id)
 {
-	int i, defbase_tot = BLI_countlist(&ob->defbase) + 1;
+	int i, defbase_tot = BLI_listbase_count(&ob->defbase) + 1;
 	int *map = MEM_mallocN(sizeof(int) * defbase_tot, "vgroup del");
 
 	map[id] = map[0] = 0;
@@ -4157,7 +4237,7 @@ void OBJECT_OT_vertex_group_set_active(wmOperatorType *ot)
 static char *vgroup_init_remap(Object *ob)
 {
 	bDeformGroup *def;
-	int defbase_tot = BLI_countlist(&ob->defbase);
+	int defbase_tot = BLI_listbase_count(&ob->defbase);
 	char *name_array = MEM_mallocN(MAX_VGROUP_NAME * sizeof(char) * defbase_tot, "sort vgroups");
 	char *name;
 
@@ -4174,7 +4254,7 @@ static int vgroup_do_remap(Object *ob, const char *name_array, wmOperator *op)
 {
 	MDeformVert *dvert = NULL;
 	bDeformGroup *def;
-	int defbase_tot = BLI_countlist(&ob->defbase);
+	int defbase_tot = BLI_listbase_count(&ob->defbase);
 
 	/* needs a dummy index at the start*/
 	int *sort_map_update = MEM_mallocN(sizeof(int) * (defbase_tot + 1), "sort vgroups");
@@ -4298,7 +4378,7 @@ static int vertex_group_sort_exec(bContext *C, wmOperator *op)
 	/*sort vgroup names*/
 	switch (sort_type) {
 		case SORT_TYPE_NAME:
-			BLI_sortlist(&ob->defbase, vgroup_sort_name);
+			BLI_listbase_sort(&ob->defbase, vgroup_sort_name);
 			break;
 		case SORT_TYPE_BONEHIERARCHY:
 			vgroup_sort_bone_hierarchy(ob, NULL);
