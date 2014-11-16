@@ -747,7 +747,7 @@ elseif(WIN32)
 
 	if(WITH_SDL)
 		install(
-			FILES ${LIBDIR}/sdl/lib/SDL.dll
+			FILES ${LIBDIR}/sdl/lib/SDL2.dll
 			DESTINATION "."
 		)
 	endif()
@@ -963,5 +963,23 @@ if(WIN32 AND NOT WITH_PYTHON_MODULE)
 	set_target_properties(blender-launcher PROPERTIES OUTPUT_NAME blender)
 
 	install(TARGETS blender blender-launcher
+			COMPONENT Blender
 			DESTINATION ".")
+
+	if(MSVC12_REDIST_DIR)
+		if(CMAKE_CL_64)
+			set(_WIN_PLATFORM x64)
+		else()
+			set(_WIN_PLATFORM x86)
+		endif()
+		install(
+			FILES ${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.CRT/msvcp120.dll
+				  ${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.CRT/msvcr120.dll
+		DESTINATION ".")
+		if(WITH_OPENMP)
+			install(
+				FILES ${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.OpenMP/vcomp120.dll
+				DESTINATION ".")
+		endif()
+	endif()
 endif()
