@@ -36,6 +36,7 @@
 
 #include "BKE_mesh_mapping.h"
 #include "BKE_customdata.h"
+#include "BLI_memarena.h"
 
 #include "BLI_strict_flags.h"
 
@@ -383,7 +384,7 @@ void BKE_mesh_origindex_map_create(MeshElemMap **r_map, int **r_mem,
 void BKE_poly_loop_islands_compute(
         const MEdge *medge, const int totedge, const MPoly *mpoly, const int totpoly,
         const MLoop *mloop, const int totloop, const bool use_bitflags,
-        check_island_boundary edge_boundary_check,
+        MeshRemap_CheckIslandBoundary edge_boundary_check,
         int **r_poly_groups, int *r_totgroup)
 {
 	int *poly_groups;
@@ -532,7 +533,7 @@ void BKE_poly_loop_islands_compute(
 	*r_poly_groups = poly_groups;
 }
 
-static bool poly_island_is_boundary_smooth_cb(
+static bool poly_is_island_boundary_smooth_cb(
         const MPoly *mp, const MLoop *UNUSED(ml), const MEdge *me,
         const int nbr_egde_users)
 {
@@ -556,8 +557,153 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 	int *poly_groups = NULL;
 
 	BKE_poly_loop_islands_compute(medge, totedge, mpoly, totpoly, mloop, totloop, use_bitflags,
-	                              poly_island_is_boundary_smooth_cb, &poly_groups, r_totgroup);
+	                              poly_is_island_boundary_smooth_cb, &poly_groups, r_totgroup);
 
 	return poly_groups;
 }
+
+
+void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const int num_items, const short island_type)
+{
+	MemArena *mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
+
+	BLI_assert(ELEM(item_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
+	BLI_assert(ELEM(island_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
+
+	BKE_loop_islands_free(islands);
+
+	islands->item_type = item_type;
+	islands->nbr_items = num_items;
+	islands->items_to_islands_idx = BLI_memarena_alloc(mem, sizeof(*islands->items_to_islands_idx) * (size_t)num_items);
+
+	islands->island_type = island_type;
+	islands->allocated_islands = 64;
+	islands->islands = BLI_memarena_alloc(mem, sizeof(*islands->islands) * islands->allocated_islands);
+
+	islands->mem = mem;
+}
+
+void BKE_loop_islands_free(MeshIslands *islands)
+{
+	MemArena *mem = islands->mem;
+
+	if (mem) {
+		BLI_memarena_free(mem);
+	}
+
+	islands->item_type = 0;
+	islands->nbr_items = 0;
+	islands->items_to_islands_idx = NULL;
+
+	islands->island_type = 0;
+	islands->nbr_islands = 0;
+	islands->islands = NULL;
+
+	islands->mem = NULL;
+	islands->allocated_islands = 0;
+}
+
+void BKE_loop_islands_add_island(MeshIslands *islands, const int num_items, int *items_indices,
+                                 const int num_island_items, int *island_item_indices)
+{
+	MemArena *mem = islands->mem;
+
+	MeshElemMap *isld;
+	const int curr_island_idx = islands->nbr_islands++;
+	const size_t curr_num_islands = (size_t)islands->nbr_islands;
+	int i = num_items;
+
+	islands->nbr_items = num_items;
+	while (i--) {
+		islands->items_to_islands_idx[items_indices[i]] = curr_island_idx;
+	}
+
+	if (UNLIKELY(curr_num_islands > islands->allocated_islands)) {
+		MeshElemMap **islds;
+
+		islands->allocated_islands *= 2;
+		islds = BLI_memarena_alloc(mem, sizeof(*islds) * islands->allocated_islands);
+		memcpy(islds, islands->islands, sizeof(*islds) * (curr_num_islands - 1));
+		islands->islands = islds;
+	}
+
+	islands->islands[curr_island_idx] = isld = BLI_memarena_alloc(mem, sizeof(*isld));
+
+	isld->count = num_island_items;
+	isld->indices = BLI_memarena_alloc(mem, sizeof(*isld->indices) * (size_t)num_island_items);
+	memcpy(isld->indices, island_item_indices, sizeof(*isld->indices) * (size_t)num_island_items);
+}
+
+/* TODO: I'm not sure edge seam flag is enough to define UV islands? Maybe we should also consider UVmaps values
+ *       themselves (i.e. different UV-edges for a same mesh-edge => boundary edge too?).
+ *       Would make things much more complex though, and each UVMap would then need its own mesh mapping,
+ *       not sure we want that at all!
+ */
+static bool mesh_check_island_boundary_uv(
+        const MPoly *UNUSED(mp), const MLoop *UNUSED(ml), const MEdge *me,
+        const int UNUSED(nbr_egde_users))
+{
+	/* Edge is UV boundary if tagged as seam. */
+	return (me->flag & ME_SEAM) != 0;
+}
+
+/* Note: all this could be optimized... Not sure it would be worth the more complex code, though, those loops
+ *       are supposed to be really quick to do... */
+bool BKE_loop_poly_island_compute_uv(
+        MVert *UNUSED(verts), const int UNUSED(totvert),
+        MEdge *edges, const int totedge,
+        MPoly *polys, const int totpoly,
+        MLoop *loops, const int totloop,
+
+        MeshIslands *r_islands)
+{
+	int *poly_groups = NULL;
+	int num_poly_groups;
+
+	int *poly_indices = MEM_mallocN(sizeof(*poly_indices) * (size_t)totpoly, __func__);
+	int *loop_indices = MEM_mallocN(sizeof(*loop_indices) * (size_t)totloop, __func__);
+	int num_pidx, num_lidx;
+
+	int grp_idx, p_idx, pl_idx, l_idx;
+
+	BKE_loop_islands_free(r_islands);
+	BKE_loop_islands_init(r_islands, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
+
+	BKE_poly_loop_islands_compute(
+	        edges, totedge, polys, totpoly, loops, totloop, false,
+	        mesh_check_island_boundary_uv, &poly_groups, &num_poly_groups);
+
+	if (!num_poly_groups) {
+		/* Should never happen... */
+		return false;
+	}
+
+	/* Note: here we ignore '0' invalid group - this should *never* happen in this case anyway? */
+	for (grp_idx = 1; grp_idx <= num_poly_groups; grp_idx++) {
+		num_pidx = num_lidx = 0;
+
+		for (p_idx = 0; p_idx < totpoly; p_idx++) {
+			MPoly *mp;
+
+			if (poly_groups[p_idx] != grp_idx) {
+				continue;
+			}
+
+			mp = &polys[p_idx];
+			poly_indices[num_pidx++] = p_idx;
+			for (l_idx = mp->loopstart, pl_idx = 0; pl_idx < mp->totloop; l_idx++, pl_idx++) {
+				loop_indices[num_lidx++] = l_idx;
+			}
+		}
+
+		BKE_loop_islands_add_island(r_islands, num_lidx, loop_indices, num_pidx, poly_indices);
+	}
+
+	MEM_freeN(poly_indices);
+	MEM_freeN(loop_indices);
+	MEM_freeN(poly_groups);
+
+	return true;
+}
+
 /** \} */

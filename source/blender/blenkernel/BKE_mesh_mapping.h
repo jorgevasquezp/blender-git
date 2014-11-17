@@ -31,8 +31,9 @@
  *  \ingroup bke
  */
 
-struct MPoly;
+struct MVert;
 struct MEdge;
+struct MPoly;
 struct MLoop;
 struct MLoopUV;
 
@@ -126,7 +127,54 @@ void BKE_mesh_origindex_map_create(
         const int totorig,
         const int *final_origindex, const int totfinal);
 
-/* smoothgroups */
+
+/* islands */
+
+/* Loop islands data helpers. */
+enum {
+	MISLAND_TYPE_VERT = 1,
+	MISLAND_TYPE_EDGE = 2,
+	MISLAND_TYPE_POLY = 3,
+	MISLAND_TYPE_LOOP = 4,
+};
+
+typedef struct MeshIslands {
+	short item_type;  /* MISLAND_TYPE_... */
+	short island_type;  /* MISLAND_TYPE_... */
+
+	int nbr_items;
+	int *items_to_islands_idx;
+
+	int nbr_islands;
+	struct MeshElemMap **islands;  /* Array of pointers, one item per island. */
+
+	void *mem;  /* Memory handler, internal use only. */
+	size_t allocated_islands;
+} MeshIslands;
+
+void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const int num_items, const short island_type);
+void BKE_loop_islands_free(MeshIslands *islands);
+void BKE_loop_islands_add_island(MeshIslands *islands, const int num_items, int *item_indices,
+                                 const int num_island_items, int *island_item_indices);
+
+typedef bool (*loop_island_compute)(
+        struct MVert *verts, const int totvert,
+        struct MEdge *edges, const int totedge,
+        struct MPoly *polys, const int totpoly,
+        struct MLoop *loops, const int totloop,
+        struct MeshIslands *r_islands);
+
+/* Above vert/UV mapping stuff does not do what we need here, but does things we do not need here.
+ * So better keep them separated for now, I think.
+ */
+bool BKE_loop_poly_island_compute_uv(
+        struct MVert *verts, const int totvert,
+        struct MEdge *edges, const int totedge,
+        struct MPoly *polys, const int totpoly,
+        struct MLoop *loops, const int totloop,
+        MeshIslands *r_islands);
+
+
 int *BKE_mesh_calc_smoothgroups(
         const struct MEdge *medge, const int totedge,
         const struct MPoly *mpoly, const int totpoly,
@@ -135,14 +183,14 @@ int *BKE_mesh_calc_smoothgroups(
 
 /** Callback deciding whether the given poly/loop/edge define an island boundary or not.
  */
-typedef bool (*check_island_boundary)(
+typedef bool (*MeshRemap_CheckIslandBoundary)(
         const struct MPoly *mpoly, const struct MLoop *mloop, const struct MEdge *medge,
         const int nbr_egde_users);
 
 void BKE_poly_loop_islands_compute(
         const struct MEdge *medge, const int totedge, const struct MPoly *mpoly, const int totpoly,
         const struct MLoop *mloop, const int totloop, const bool use_bitflags,
-        check_island_boundary edge_boundary_check,
+        MeshRemap_CheckIslandBoundary edge_boundary_check,
         int **r_poly_groups, int *r_totgroup);
 
 /* No good (portable) way to have exported inlined functions... */

@@ -29,39 +29,6 @@ struct DerivedMesh;
 struct MVert;
 struct MeshElemMap;
 
-/* Loop islands data helpers. */
-enum {
-	MISLAND_TYPE_VERT = 1,
-	MISLAND_TYPE_EDGE = 2,
-	MISLAND_TYPE_POLY = 3,
-	MISLAND_TYPE_LOOP = 4,
-};
-
-typedef struct MeshIslands {
-	short item_type;  /* MISLAND_TYPE_... */
-	short island_type;  /* MISLAND_TYPE_... */
-
-	int nbr_items;
-	int *items_to_islands_idx;
-
-	int nbr_islands;
-	struct MeshElemMap **islands;  /* Array of pointers, one item per island. */
-
-	void *mem;  /* Memory handler, internal use only. */
-	size_t allocated_islands;
-} MeshIslands;
-
-void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const int num_items, const short island_type);
-void BKE_loop_islands_free(MeshIslands *islands);
-void BKE_loop_islands_add_island(MeshIslands *islands, const int num_items, int *item_indices,
-                                 const int num_island_items, int *island_item_indices);
-
-typedef bool (*loop_island_compute)(struct DerivedMesh *dm, MeshIslands *r_islands);
-/* Above vert/UV mapping stuff does not do what we need here, but does things we do not need here.
- * So better keep them separated for now, I think.
- */
-bool BKE_loop_poly_island_compute_uv(struct DerivedMesh *dm, MeshIslands *r_islands);
-
 /* Generic ways to map some geometry elements from a source mesh to a dest one. */
 
 typedef struct Mesh2MeshMappingItem {

@@ -45,150 +45,6 @@
 #include "BKE_mesh_remap.h"  /* own include */
 
 
-void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const int num_items, const short island_type)
-{
-	MemArena *mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
-
-	BLI_assert(ELEM(item_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
-	BLI_assert(ELEM(island_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
-
-	BKE_loop_islands_free(islands);
-
-	islands->item_type = item_type;
-	islands->nbr_items = num_items;
-	islands->items_to_islands_idx = BLI_memarena_alloc(mem, sizeof(*islands->items_to_islands_idx) * (size_t)num_items);
-
-	islands->island_type = island_type;
-	islands->allocated_islands = 64;
-	islands->islands = BLI_memarena_alloc(mem, sizeof(*islands->islands) * islands->allocated_islands);
-
-	islands->mem = mem;
-}
-
-void BKE_loop_islands_free(MeshIslands *islands)
-{
-	MemArena *mem = islands->mem;
-
-	if (mem) {
-		BLI_memarena_free(mem);
-	}
-
-	islands->item_type = 0;
-	islands->nbr_items = 0;
-	islands->items_to_islands_idx = NULL;
-
-	islands->island_type = 0;
-	islands->nbr_islands = 0;
-	islands->islands = NULL;
-
-	islands->mem = NULL;
-	islands->allocated_islands = 0;
-}
-
-void BKE_loop_islands_add_island(MeshIslands *islands, const int num_items, int *items_indices,
-                                 const int num_island_items, int *island_item_indices)
-{
-	MemArena *mem = islands->mem;
-
-	MeshElemMap *isld;
-	const int curr_island_idx = islands->nbr_islands++;
-	const size_t curr_num_islands = (size_t)islands->nbr_islands;
-	int i = num_items;
-
-	islands->nbr_items = num_items;
-	while (i--) {
-		islands->items_to_islands_idx[items_indices[i]] = curr_island_idx;
-	}
-
-	if (UNLIKELY(curr_num_islands > islands->allocated_islands)) {
-		MeshElemMap **islds;
-
-		islands->allocated_islands *= 2;
-		islds = BLI_memarena_alloc(mem, sizeof(*islds) * islands->allocated_islands);
-		memcpy(islds, islands->islands, sizeof(*islds) * (curr_num_islands - 1));
-		islands->islands = islds;
-	}
-
-	islands->islands[curr_island_idx] = isld = BLI_memarena_alloc(mem, sizeof(*isld));
-
-	isld->count = num_island_items;
-	isld->indices = BLI_memarena_alloc(mem, sizeof(*isld->indices) * (size_t)num_island_items);
-	memcpy(isld->indices, island_item_indices, sizeof(*isld->indices) * (size_t)num_island_items);
-}
-
-/* TODO: I'm not sure edge seam flag is enough to define UV islands? Maybe we should also consider UVmaps values
- *       themselves (i.e. different UV-edges for a same mesh-edge => boundary edge too?).
- *       Would make things much more complex though, and each UVMap would then need its own mesh mapping,
- *       not sure we want that at all!
- */
-static bool bke_check_island_boundary_uv(const MPoly *UNUSED(mp), const MLoop *UNUSED(ml), const MEdge *me,
-                                         const int UNUSED(nbr_egde_users))
-{
-	/* Edge is UV boundary if tagged as seam. */
-	return (me->flag & ME_SEAM) != 0;
-}
-
-/* Note: all this could be optimized... Not sure it would be worth the more complex code, though, those loops
- *       are supposed to be really quick to do... */
-bool BKE_loop_poly_island_compute_uv(struct DerivedMesh *dm, MeshIslands *r_islands)
-{
-	MEdge *edges = dm->getEdgeArray(dm);
-	MPoly *polys = dm->getPolyArray(dm);
-	MLoop *loops = dm->getLoopArray(dm);
-	const int num_edges = dm->getNumEdges(dm);
-	const int num_polys = dm->getNumPolys(dm);
-	const int num_loops = dm->getNumLoops(dm);
-
-	int *poly_groups = NULL;
-	int num_poly_groups;
-
-	int *poly_indices = MEM_mallocN(sizeof(*poly_indices) * (size_t)num_polys, __func__);
-	int *loop_indices = MEM_mallocN(sizeof(*loop_indices) * (size_t)num_loops, __func__);
-	int num_pidx, num_lidx;
-
-	int grp_idx, p_idx, pl_idx, l_idx;
-
-	BKE_loop_islands_free(r_islands);
-	BKE_loop_islands_init(r_islands, MISLAND_TYPE_LOOP, num_loops, MISLAND_TYPE_POLY);
-
-	BKE_poly_loop_islands_compute(edges, num_edges, polys, num_polys, loops, num_loops, false,
-	                              bke_check_island_boundary_uv, &poly_groups, &num_poly_groups);
-
-	if (!num_poly_groups) {
-		/* Should never happen... */
-		return false;
-	}
-
-	/* Note: here we ignore '0' invalid group - this should *never* happen in this case anyway? */
-	for (grp_idx = 1; grp_idx <= num_poly_groups; grp_idx++) {
-		num_pidx = num_lidx = 0;
-
-		for (p_idx = 0; p_idx < num_polys; p_idx++) {
-			MPoly *mp;
-
-			if (poly_groups[p_idx] != grp_idx) {
-				continue;
-			}
-
-			mp = &polys[p_idx];
-			poly_indices[num_pidx++] = p_idx;
-			for (l_idx = mp->loopstart, pl_idx = 0; pl_idx < mp->totloop; l_idx++, pl_idx++) {
-				loop_indices[num_lidx++] = l_idx;
-			}
-		}
-
-		BKE_loop_islands_add_island(r_islands, num_lidx, loop_indices, num_pidx, poly_indices);
-	}
-
-	MEM_freeN(poly_indices);
-	MEM_freeN(loop_indices);
-	MEM_freeN(poly_groups);
-
-	return true;
-}
-
-/** \} */
-
 /* -------------------------------------------------------------------- */
 
 /** \name Mesh to mesh mapping
@@ -578,8 +434,8 @@ void BKE_dm2mesh_mapping_edges_compute(
 		float hitdist;
 
 		if (mode == M2MMAP_MODE_EDGE_VERT_NEAREST) {
-			const int numverts_src = dm_src->getNumVerts(dm_src);
-			const int numedges_src = dm_src->getNumEdges(dm_src);
+			const int num_verts_src = dm_src->getNumVerts(dm_src);
+			const int num_edges_src = dm_src->getNumEdges(dm_src);
 			MEdge *edges_src = dm_src->getEdgeArray(dm_src);
 			float (*vcos_src)[3] = MEM_mallocN(sizeof(*vcos_src) * (size_t)dm_src->getNumVerts(dm_src), __func__);
 
@@ -591,7 +447,7 @@ void BKE_dm2mesh_mapping_edges_compute(
 			fill_vn_fl((float *)v_dst2src_map, numverts_dst * 2, -1.0f);
 
 			BKE_mesh_vert_edge_map_create(&vert2edge_src_map, &vert2edge_src_map_mem,
-			                              edges_src, numverts_src, numedges_src);
+			                              edges_src, num_verts_src, num_edges_src);
 
 			dm_src->getVertCos(dm_src, vcos_src);
 
@@ -1021,7 +877,16 @@ void BKE_dm2mesh_mapping_loops_compute(
 
 		/* First, generate the islands, if possible. */
 		if (gen_islands_src) {
-			use_islands = gen_islands_src(dm_src, &islands);
+			const int num_edges_src = dm_src->getNumEdges(dm_src);
+			MEdge *edges_src = dm_src->getEdgeArray(dm_src);
+
+			use_islands = gen_islands_src(
+			        verts_src, num_verts_src,
+			        edges_src, num_edges_src,
+			        polys_src, num_polys_src,
+			        loops_src, num_loops_src,
+			        &islands);
+
 			num_trees = use_islands ? islands.nbr_islands : 1;
 			treedata = MEM_callocN(sizeof(*treedata) * (size_t)num_trees, __func__);
 
