@@ -49,22 +49,23 @@ enum {
 	DT_TYPE_SHAPEKEY                = 1 << 1,
 	DT_TYPE_SKIN                    = 1 << 2,
 	DT_TYPE_BWEIGHT_VERT            = 1 << 3,
-	DT_TYPE_VERT_ALL                = DT_TYPE_MDEFORMVERT | DT_TYPE_SHAPEKEY | DT_TYPE_SKIN | DT_TYPE_BWEIGHT_VERT,
 
 	DT_TYPE_SHARP_EDGE              = 1 << 8,
 	DT_TYPE_SEAM                    = 1 << 9,
 	DT_TYPE_CREASE                  = 1 << 10,
 	DT_TYPE_BWEIGHT_EDGE            = 1 << 11,
 	DT_TYPE_FREESTYLE_EDGE          = 1 << 12,
-	DT_TYPE_EDGE_ALL                = DT_TYPE_SHARP_EDGE | DT_TYPE_SEAM | DT_TYPE_CREASE | DT_TYPE_BWEIGHT_EDGE |
-	                                  DT_TYPE_FREESTYLE_EDGE,
 
 	DT_TYPE_VCOL                    = 1 << 16,
-	DT_TYPE_LOOP_ALL                = DT_TYPE_VCOL,
 
 	DT_TYPE_UV                      = 1 << 24,
 	DT_TYPE_SHARP_FACE              = 1 << 25,
 	DT_TYPE_FREESTYLE_FACE          = 1 << 26,
+
+	DT_TYPE_VERT_ALL                = DT_TYPE_MDEFORMVERT | DT_TYPE_SHAPEKEY | DT_TYPE_SKIN | DT_TYPE_BWEIGHT_VERT,
+	DT_TYPE_EDGE_ALL                = DT_TYPE_SHARP_EDGE | DT_TYPE_SEAM | DT_TYPE_CREASE | DT_TYPE_BWEIGHT_EDGE |
+	                                  DT_TYPE_FREESTYLE_EDGE,
+	DT_TYPE_LOOP_ALL                = DT_TYPE_VCOL | DT_TYPE_UV,
 	DT_TYPE_POLY_ALL                = DT_TYPE_UV | DT_TYPE_SHARP_FACE | DT_TYPE_FREESTYLE_FACE,
 };
 

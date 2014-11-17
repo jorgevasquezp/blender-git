@@ -1273,7 +1273,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         split.prop(md, "use_loop_data")
         use_loop = md.use_loop_data
         row = split.row()
-        row.active = use_loop or 'UV' in md.data_types_polys_uv  # Exception!
+        row.active = use_loop
         row.prop(md, "loop_mapping", text="")
         if use_loop:
             col = layout.column(align=True)
@@ -1287,6 +1287,13 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             row.prop(md, "fromlayers_vcol_select", text="")
             row.label(icon='RIGHTARROW')
             row.prop(md, "tolayers_vcol_select", text="")
+            split = col.split(0.333, align=True)
+            sub = split.column(align=True)
+            sub.prop(md, "data_types_loops_uv")
+            row = split.row(align=True)
+            row.prop(md, "fromlayers_uv_select", text="")
+            row.label(icon='RIGHTARROW')
+            row.prop(md, "tolayers_uv_select", text="")
 
         layout.separator()
 
@@ -1298,13 +1305,6 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "poly_mapping", text="")
         if use_poly:
             col = layout.column(align=True)
-            split = col.split(0.333, align=True)
-            sub = split.column(align=True)
-            sub.prop(md, "data_types_polys_uv")
-            row = split.row(align=True)
-            row.prop(md, "fromlayers_uv_select", text="")
-            row.label(icon='RIGHTARROW')
-            row.prop(md, "tolayers_uv_select", text="")
             split = col.split(0.333, align=True)
             sub = split.column(align=True)
             sub.prop(md, "data_types_polys")

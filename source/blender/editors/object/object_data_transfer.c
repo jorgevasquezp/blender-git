@@ -80,8 +80,8 @@ static EnumPropertyItem DT_layer_items[] = {
 	{DT_TYPE_FREESTYLE_EDGE, "FREESTYLE_EDGE", 0, "Freestyle Mark", "Transfer Freestyle edge mark"},
 	{0, "", 0, "Face Corner Data", ""},
 	{DT_TYPE_VCOL, "VCOL", 0, "VCol", "Vertex (face corners) colors"},
-	{0, "", 0, "Face Data", ""},
 	{DT_TYPE_UV, "UV", 0, "UVs", "Transfer UV layers"},
+	{0, "", 0, "Face Data", ""},
 	{DT_TYPE_SHARP_FACE, "SMOOTH", 0, "Smooth", "Transfer flat/smooth mark"},
 	{DT_TYPE_FREESTYLE_FACE, "FREESTYLE_FACE", 0, "Freestyle Mark", "Transfer Freestyle face mark"},
 	{0, NULL, 0, NULL, NULL}

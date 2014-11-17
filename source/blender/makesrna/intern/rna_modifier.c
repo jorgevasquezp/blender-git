@@ -4071,14 +4071,14 @@ static void rna_def_modifier_datatransfer(BlenderRNA *brna)
 		{DT_TYPE_VCOL, "VCOL", 0, "VCol", "Vertex (face corners) colors"},
 		{0, NULL, 0, NULL, NULL}
 	};
+	static EnumPropertyItem DT_layer_loop_uv_items[] = {
+		{DT_TYPE_UV, "UV", 0, "UVs", "Transfer UV layers"},
+		{0, NULL, 0, NULL, NULL}
+	};
 
 	static EnumPropertyItem DT_layer_poly_items[] = {
 		{DT_TYPE_SHARP_FACE, "SMOOTH", 0, "Smooth", "Transfer flat/smooth mark"},
 		{DT_TYPE_FREESTYLE_FACE, "FREESTYLE_FACE", 0, "Freestyle Mark", "Transfer Freestyle face mark"},
-		{0, NULL, 0, NULL, NULL}
-	};
-	static EnumPropertyItem DT_layer_poly_uv_items[] = {
-		{DT_TYPE_UV, "UV", 0, "UVs", "Transfer UV layers"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -4143,13 +4143,13 @@ static void rna_def_modifier_datatransfer(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
 	RNA_def_property_enum_sdna(prop, NULL, "data_types");
 	RNA_def_property_update(prop, 0, "rna_DataTransferModifier_data_types_update");
-
-	prop = RNA_def_enum(srna, "data_types_polys", DT_layer_poly_items, 0, "Poly Data Types",
-	                    "Which poly data layers to transfer");
+	prop = RNA_def_enum(srna, "data_types_loops_uv", DT_layer_loop_uv_items, 0, "Face Corner Data Types",
+	                    "Which face corner data layers to transfer");
 	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
 	RNA_def_property_enum_sdna(prop, NULL, "data_types");
 	RNA_def_property_update(prop, 0, "rna_DataTransferModifier_data_types_update");
-	prop = RNA_def_enum(srna, "data_types_polys_uv", DT_layer_poly_uv_items, 0, "Poly Data Types",
+
+	prop = RNA_def_enum(srna, "data_types_polys", DT_layer_poly_items, 0, "Poly Data Types",
 	                    "Which poly data layers to transfer");
 	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
 	RNA_def_property_enum_sdna(prop, NULL, "data_types");
