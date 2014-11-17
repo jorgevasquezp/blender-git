@@ -607,7 +607,6 @@ void BKE_mesh_loop_islands_clear(MeshIslands *islands)
 
 	if (islands->mem) {
 		BLI_memarena_clear(islands->mem);
-		islands->mem = NULL;
 	}
 
 	islands->allocated_islands = 0;
@@ -617,6 +616,7 @@ void BKE_mesh_loop_islands_free(MeshIslands *islands)
 {
 	if (islands->mem) {
 		BLI_memarena_free(islands->mem);
+		islands->mem = NULL;
 	}
 }
 
