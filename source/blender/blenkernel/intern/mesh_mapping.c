@@ -2110,7 +2110,7 @@ void BKE_dm2mesh_mapping_polys_compute(
 						int n = (ray_radius > 0.0f) ? M2MMAP_RAYCAST_APPROXIMATE_NR : 1;
 						float w = 1.0f;
 
-						BLI_tri_v2_sample_random_point(v1, v2, v3, rng, tmp_co);
+						BLI_rng_get_tri_sample_float_v2(rng, v1, v2, v3, tmp_co);
 
 						tmp_co[2] = poly_dst_2d_z;
 						mul_m3_v3(from_pnor_2d_mat, tmp_co);
