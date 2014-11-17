@@ -138,27 +138,27 @@ enum {
 	MISLAND_TYPE_LOOP = 4,
 };
 
-typedef struct MeshIslands {
-	short item_type;  /* MISLAND_TYPE_... */
+typedef struct MeshIslandStore {
+	short item_type;    /* MISLAND_TYPE_... */
 	short island_type;  /* MISLAND_TYPE_... */
 
-	int nbr_items;
-	int *items_to_islands_idx;
+	int  items_to_islands_num;
+	int *items_to_islands;  /* map the item to the island index */
 
-	int nbr_islands;
+	int                  islands_num;
+	size_t               islands_num_alloc;
 	struct MeshElemMap **islands;  /* Array of pointers, one item per island. */
 
-	void *mem;  /* Memory handler, internal use only. */
-	size_t allocated_islands;
-} MeshIslands;
+	struct MemArena *mem;  /* Memory arena, internal use only. */
+} MeshIslandStore;
 
 void BKE_mesh_loop_islands_init(
-        MeshIslands *islands,
-        const short item_type, const int num_items, const short island_type);
-void BKE_mesh_loop_islands_clear(MeshIslands *islands);
-void BKE_mesh_loop_islands_free(MeshIslands *islands);
+        MeshIslandStore *island_store,
+        const short item_type, const int item_num, const short island_type);
+void BKE_mesh_loop_islands_clear(MeshIslandStore *island_store);
+void BKE_mesh_loop_islands_free(MeshIslandStore *island_store);
 void BKE_mesh_loop_islands_add(
-        MeshIslands *islands, const int num_items, int *item_indices,
+        MeshIslandStore *islands, const int item_num, int *item_indices,
         const int num_island_items, int *island_item_indices);
 
 typedef bool (*MeshRemapIslandsCalc)(
@@ -166,7 +166,7 @@ typedef bool (*MeshRemapIslandsCalc)(
         struct MEdge *edges, const int totedge,
         struct MPoly *polys, const int totpoly,
         struct MLoop *loops, const int totloop,
-        struct MeshIslands *r_islands);
+        struct MeshIslandStore *r_island_store);
 
 /* Above vert/UV mapping stuff does not do what we need here, but does things we do not need here.
  * So better keep them separated for now, I think.
@@ -176,7 +176,7 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
         struct MEdge *edges, const int totedge,
         struct MPoly *polys, const int totpoly,
         struct MLoop *loops, const int totloop,
-        MeshIslands *r_islands);
+        MeshIslandStore *r_island_store);
 
 int *BKE_mesh_calc_smoothgroups(
         const struct MEdge *medge, const int totedge,

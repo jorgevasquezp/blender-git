@@ -765,7 +765,7 @@ void BKE_dm2mesh_mapping_loops_compute(
 
 		const bool use_from_vert = (mode & M2MMAP_USE_VERT);
 
-		MeshIslands islands = {0};
+		MeshIslandStore island_store = {0};
 		bool use_islands = false;
 
 		float (*poly_nors_src)[3] = NULL;
@@ -885,15 +885,15 @@ void BKE_dm2mesh_mapping_loops_compute(
 			        edges_src, num_edges_src,
 			        polys_src, num_polys_src,
 			        loops_src, num_loops_src,
-			        &islands);
+			        &island_store);
 
-			num_trees = use_islands ? islands.nbr_islands : 1;
+			num_trees = use_islands ? island_store.islands_num : 1;
 			treedata = MEM_callocN(sizeof(*treedata) * (size_t)num_trees, __func__);
 
 			if (use_islands) {
 				/* We expect our islands to contain poly indices, and a mapping loops -> islands indices.
 				 * This implies all loops of a same poly are in the same island. */
-				BLI_assert((islands.item_type == MISLAND_TYPE_LOOP) && (islands.island_type == MISLAND_TYPE_POLY));
+				BLI_assert((island_store.item_type == MISLAND_TYPE_LOOP) && (island_store.island_type == MISLAND_TYPE_POLY));
 			}
 		}
 		else {
@@ -907,7 +907,7 @@ void BKE_dm2mesh_mapping_loops_compute(
 				BLI_bitmap *verts_active = BLI_BITMAP_NEW((size_t)num_verts_src, __func__);
 
 				for (tidx = 0; tidx < num_trees; tidx++) {
-					MeshElemMap *isld = islands.islands[tidx];
+					MeshElemMap *isld = island_store.islands[tidx];
 					int num_verts_active = 0;
 					BLI_BITMAP_SET_ALL(verts_active, false, (size_t)num_verts_src);
 					for (i = 0; i < isld->count; i++) {
@@ -956,7 +956,7 @@ void BKE_dm2mesh_mapping_loops_compute(
 					BLI_BITMAP_SET_ALL(faces_active, false, (size_t)num_faces_src);
 					for (i = 0; i < num_faces_src; i++) {
 						MPoly *mp_src = &polys_src[orig_poly_idx_src[i]];
-						if (islands.items_to_islands_idx[mp_src->loopstart] == tidx) {
+						if (island_store.items_to_islands[mp_src->loopstart] == tidx) {
 							BLI_BITMAP_ENABLE(faces_active, i);
 							num_faces_active++;
 						}
@@ -1232,7 +1232,7 @@ void BKE_dm2mesh_mapping_loops_compute(
 		if (weights_interp) {
 			MEM_freeN(weights_interp);
 		}
-		BKE_mesh_loop_islands_free(&islands);
+		BKE_mesh_loop_islands_free(&island_store);
 		MEM_freeN(treedata);
 	}
 }

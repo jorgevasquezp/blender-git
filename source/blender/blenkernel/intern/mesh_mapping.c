@@ -571,10 +571,10 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 
 
 void BKE_mesh_loop_islands_init(
-        MeshIslands *islands,
-        const short item_type, const int num_items, const short island_type)
+        MeshIslandStore *island_store,
+        const short item_type, const int items_num, const short island_type)
 {
-	MemArena *mem = islands->mem;
+	MemArena *mem = island_store->mem;
 
 	if (mem == NULL) {
 		mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
@@ -584,68 +584,68 @@ void BKE_mesh_loop_islands_init(
 	BLI_assert(ELEM(item_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
 	BLI_assert(ELEM(island_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
 
-	islands->item_type = item_type;
-	islands->nbr_items = num_items;
-	islands->items_to_islands_idx = BLI_memarena_alloc(mem, sizeof(*islands->items_to_islands_idx) * (size_t)num_items);
+	island_store->item_type = item_type;
+	island_store->items_to_islands_num = items_num;
+	island_store->items_to_islands = BLI_memarena_alloc(mem, sizeof(*island_store->items_to_islands) * (size_t)items_num);
 
-	islands->island_type = island_type;
-	islands->allocated_islands = 64;
-	islands->islands = BLI_memarena_alloc(mem, sizeof(*islands->islands) * islands->allocated_islands);
+	island_store->island_type = island_type;
+	island_store->islands_num_alloc = 64;
+	island_store->islands = BLI_memarena_alloc(mem, sizeof(*island_store->islands) * island_store->islands_num_alloc);
 
-	islands->mem = mem;
+	island_store->mem = mem;
 }
 
-void BKE_mesh_loop_islands_clear(MeshIslands *islands)
+void BKE_mesh_loop_islands_clear(MeshIslandStore *island_store)
 {
-	islands->item_type = 0;
-	islands->nbr_items = 0;
-	islands->items_to_islands_idx = NULL;
+	island_store->item_type = 0;
+	island_store->items_to_islands_num = 0;
+	island_store->items_to_islands = NULL;
 
-	islands->island_type = 0;
-	islands->nbr_islands = 0;
-	islands->islands = NULL;
+	island_store->island_type = 0;
+	island_store->islands_num = 0;
+	island_store->islands = NULL;
 
-	if (islands->mem) {
-		BLI_memarena_clear(islands->mem);
+	if (island_store->mem) {
+		BLI_memarena_clear(island_store->mem);
 	}
 
-	islands->allocated_islands = 0;
+	island_store->islands_num_alloc = 0;
 }
 
-void BKE_mesh_loop_islands_free(MeshIslands *islands)
+void BKE_mesh_loop_islands_free(MeshIslandStore *island_store)
 {
-	if (islands->mem) {
-		BLI_memarena_free(islands->mem);
-		islands->mem = NULL;
+	if (island_store->mem) {
+		BLI_memarena_free(island_store->mem);
+		island_store->mem = NULL;
 	}
 }
 
 void BKE_mesh_loop_islands_add(
-        MeshIslands *islands, const int num_items, int *items_indices,
+        MeshIslandStore *island_store, const int item_num, int *items_indices,
         const int num_island_items, int *island_item_indices)
 {
-	MemArena *mem = islands->mem;
+	MemArena *mem = island_store->mem;
 
 	MeshElemMap *isld;
-	const int curr_island_idx = islands->nbr_islands++;
-	const size_t curr_num_islands = (size_t)islands->nbr_islands;
-	int i = num_items;
+	const int curr_island_idx = island_store->islands_num++;
+	const size_t curr_num_islands = (size_t)island_store->islands_num;
+	int i = item_num;
 
-	islands->nbr_items = num_items;
+	island_store->items_to_islands_num = item_num;
 	while (i--) {
-		islands->items_to_islands_idx[items_indices[i]] = curr_island_idx;
+		island_store->items_to_islands[items_indices[i]] = curr_island_idx;
 	}
 
-	if (UNLIKELY(curr_num_islands > islands->allocated_islands)) {
+	if (UNLIKELY(curr_num_islands > island_store->islands_num_alloc)) {
 		MeshElemMap **islds;
 
-		islands->allocated_islands *= 2;
-		islds = BLI_memarena_alloc(mem, sizeof(*islds) * islands->allocated_islands);
-		memcpy(islds, islands->islands, sizeof(*islds) * (curr_num_islands - 1));
-		islands->islands = islds;
+		island_store->islands_num_alloc *= 2;
+		islds = BLI_memarena_alloc(mem, sizeof(*islds) * island_store->islands_num_alloc);
+		memcpy(islds, island_store->islands, sizeof(*islds) * (curr_num_islands - 1));
+		island_store->islands = islds;
 	}
 
-	islands->islands[curr_island_idx] = isld = BLI_memarena_alloc(mem, sizeof(*isld));
+	island_store->islands[curr_island_idx] = isld = BLI_memarena_alloc(mem, sizeof(*isld));
 
 	isld->count = num_island_items;
 	isld->indices = BLI_memarena_alloc(mem, sizeof(*isld->indices) * (size_t)num_island_items);
@@ -676,7 +676,7 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
         MPoly *polys, const int totpoly,
         MLoop *loops, const int totloop,
 
-        MeshIslands *r_islands)
+        MeshIslandStore *r_island_store)
 {
 	int *poly_groups = NULL;
 	int num_poly_groups;
@@ -687,8 +687,8 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 
 	int grp_idx, p_idx, pl_idx, l_idx;
 
-	BKE_mesh_loop_islands_clear(r_islands);
-	BKE_mesh_loop_islands_init(r_islands, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
+	BKE_mesh_loop_islands_clear(r_island_store);
+	BKE_mesh_loop_islands_init(r_island_store, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
 
 	poly_loop_islands_calc(
 	        edges, totedge, polys, totpoly, loops, totloop, false,
@@ -717,7 +717,7 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 			}
 		}
 
-		BKE_mesh_loop_islands_add(r_islands, num_lidx, loop_indices, num_pidx, poly_indices);
+		BKE_mesh_loop_islands_add(r_island_store, num_lidx, loop_indices, num_pidx, poly_indices);
 	}
 
 	MEM_freeN(poly_indices);
