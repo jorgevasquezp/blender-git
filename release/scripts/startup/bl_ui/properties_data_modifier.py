@@ -1227,9 +1227,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
     def DATA_TRANSFER(self, layout, ob, md):
         row = layout.row(align=True)
-        row.prop(md, "ob_source")
+        row.prop(md, "object")
         sub = row.row(align=True)
-        sub.active = bool(md.ob_source)
+        sub.active = bool(md.object)
         sub.prop(md, "use_object_transform", text="", icon='GROUP')
 
         layout.separator()

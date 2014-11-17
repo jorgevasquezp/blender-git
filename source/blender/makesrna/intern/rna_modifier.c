@@ -4093,7 +4093,8 @@ static void rna_def_modifier_datatransfer(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "DataTransferModifierData");
 	RNA_def_struct_ui_icon(srna, ICON_MOD_WIREFRAME);  /* XXX TODO */
 
-	prop = RNA_def_property(srna, "ob_source", PROP_POINTER, PROP_NONE);
+	prop = RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "ob_source");
 	RNA_def_property_ui_text(prop, "Source Object", "Object to transfer data from");
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
 	RNA_def_property_pointer_funcs(prop, NULL, "rna_DataTransferModifier_ob_source_set", NULL, "rna_Mesh_object_poll");
