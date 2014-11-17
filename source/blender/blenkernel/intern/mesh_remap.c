@@ -238,6 +238,9 @@ typedef struct IslandResult {
 #define MREMAP_RAYCAST_TRI_SAMPLES_MIN 4
 #define MREMAP_RAYCAST_TRI_SAMPLES_MAX 20
 
+/* Will be enough in 99% of cases. */
+#define MREMAP_DEFAULT_BUFSIZE 32
+
 void BKE_mesh_remap_calc_verts_from_dm(
         const int mode, const SpaceTransform *space_transform, const float max_dist, const float ray_radius,
         const MVert *verts_dst, const int numverts_dst, const bool UNUSED(dirty_nors_dst), DerivedMesh *dm_src,
@@ -302,12 +305,12 @@ void BKE_mesh_remap_calc_verts_from_dm(
 				        tmp_co, max_dist_sq, &hit_dist))
 				{
 					MEdge *me = &edges_src[nearest.index];
-					float (*v1cos)[3] = &vcos_src[me->v1];
-					float (*v2cos)[3] = &vcos_src[me->v2];
+					const float *v1cos = vcos_src[me->v1];
+					const float *v2cos = vcos_src[me->v2];
 
 					if (mode == MREMAP_MODE_VERT_EDGE_NEAREST) {
-						const float dist_v1 = len_squared_v3v3(tmp_co, *v1cos);
-						const float dist_v2 = len_squared_v3v3(tmp_co, *v2cos);
+						const float dist_v1 = len_squared_v3v3(tmp_co, v1cos);
+						const float dist_v2 = len_squared_v3v3(tmp_co, v2cos);
 						const int index = (int)((dist_v1 > dist_v2) ? me->v2 : me->v1);
 						mesh_remap_item_define(r_map, i, hit_dist, 0, 1, &index, &full_weight);
 					}
@@ -319,7 +322,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 						indices[1] = (int)me->v2;
 
 						/* Weight is inverse of point factor here... */
-						weights[0] = line_point_factor_v3(tmp_co, *v2cos, *v1cos);
+						weights[0] = line_point_factor_v3(tmp_co, v2cos, v1cos);
 						CLAMP(weights[0], 0.0f, 1.0f);
 						weights[1] = 1.0f - weights[0];
 
@@ -342,7 +345,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 			float (*vcos_src)[3] = MEM_mallocN(sizeof(*vcos_src) * (size_t)dm_src->getNumVerts(dm_src), __func__);
 			int *orig_poly_index_src;
 
-			size_t tmp_buff_size = 32;  /* Will be enough in 99% of cases. */
+			size_t tmp_buff_size = MREMAP_DEFAULT_BUFSIZE;
 			float (*vcos)[3] = MEM_mallocN(sizeof(*vcos) * tmp_buff_size, __func__);
 			int *indices = MEM_mallocN(sizeof(*indices) * tmp_buff_size, __func__);
 			float *weights = MEM_mallocN(sizeof(*weights) * tmp_buff_size, __func__);
@@ -823,7 +826,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 		int *orig_poly_index_src = NULL;
 
-		size_t buff_size_interp = 32;  /* Will be enough in 99% of cases. */
+		size_t buff_size_interp = MREMAP_DEFAULT_BUFSIZE;
 		float (*vcos_interp)[3] = NULL;
 		int *indices_interp = NULL;
 		float *weights_interp = NULL;
@@ -831,7 +834,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		int tindex, pidx_dst, lidx_dst, plidx_dst, pidx_src, lidx_src, plidx_src;
 
 		IslandResult **islands_res;
-		size_t islands_res_buff_size = 32;
+		size_t islands_res_buff_size = MREMAP_DEFAULT_BUFSIZE;
 
 		const float bvh_epsilon = (mode & MREMAP_USE_NORPROJ) ? MREMAP_RAYCAST_APPROXIMATE_BVHEPSILON(ray_radius) : 0.0f;
 
@@ -1380,7 +1383,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 			int *indices = MEM_mallocN(sizeof(*indices) * numpolys_src, __func__);
 			float *weights = MEM_mallocN(sizeof(*weights) * numpolys_src, __func__);
 
-			size_t tmp_poly_size = 32;  /* Will be enough in 99% of cases. */
+			size_t tmp_poly_size = MREMAP_DEFAULT_BUFSIZE;
 			float (*poly_vcos_2d)[2] = MEM_mallocN(sizeof(*poly_vcos_2d) * tmp_poly_size, __func__);
 			/* Tessellated 2D poly, always (num_loops - 2) triangles. */
 			int (*tri_vidx_2d)[3] = MEM_mallocN(sizeof(*tri_vidx_2d) * (tmp_poly_size - 2), __func__);
@@ -1553,5 +1556,8 @@ void BKE_mesh_remap_calc_polys_from_dm(
 #undef MREMAP_RAYCAST_APPROXIMATE_NR
 #undef MREMAP_RAYCAST_APPROXIMATE_FAC
 #undef MREMAP_RAYCAST_APPROXIMATE_BVHEPSILON
+#undef MREMAP_RAYCAST_TRI_SAMPLES_MIN
+#undef MREMAP_RAYCAST_TRI_SAMPLES_MAX
+#undef MREMAP_DEFAULT_BUFSIZE
 
 /** \} */
