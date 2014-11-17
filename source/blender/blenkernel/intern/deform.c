@@ -1111,7 +1111,8 @@ static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap
 }
 
 static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
-        ListBase *r_map, const int mix_mode, const float mix_factor, const float *mix_weights, const int num_create,
+        ListBase *r_map, const int mix_mode, const float mix_factor, const float *mix_weights,
+        const int num_elem_dst, const bool use_create,
         Object *ob_src, Object *ob_dst, MDeformVert *data_src, MDeformVert *data_dst, const bool UNUSED(dup_dst),
         const int tolayers, bool *use_layers_src, const int num_layers_src)
 {
@@ -1130,7 +1131,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 			idx_src++;
 
 			if (idx_dst < idx_src) {
-				if (!num_create) {
+				if (!use_create) {
 					return false;
 				}
 				/* Create as much vgroups as necessary! */
@@ -1157,7 +1158,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 					}
 
 					if ((idx_dst = defgroup_name_index(ob_dst, dg_src->name)) == -1) {
-						if (!num_create) {
+						if (!use_create) {
 							BLI_freelistN(r_map);
 							return false;
 						}
@@ -1180,8 +1181,8 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 
 bool data_transfer_layersmapping_vgroups(
         ListBase *r_map, const int mix_mode, const float mix_factor, const float *mix_weights,
-        const int num_create, Object *ob_src, Object *ob_dst, CustomData *cd_src, CustomData *cd_dst,
-        const bool dup_dst, const int fromlayers, const int tolayers)
+        const int num_elem_dst, const bool use_create, Object *ob_src, Object *ob_dst,
+        CustomData *cd_src, CustomData *cd_dst, const bool dup_dst, const int fromlayers, const int tolayers)
 {
 	int idx_src, idx_dst;
 	MDeformVert *data_src, *data_dst = NULL;
@@ -1193,21 +1194,14 @@ bool data_transfer_layersmapping_vgroups(
 	}
 
 	if (!CustomData_has_layer(cd_dst, CD_MDEFORMVERT)) {
-		if (!num_create) {
-			return false;
-		}
-		if (dup_dst) {
-			data_dst = CustomData_add_layer(cd_dst, CD_MDEFORMVERT, CD_CALLOC, NULL, num_create);
-		}
-		else {
-			Mesh *me = ob_dst->data;
-			data_dst = me->dvert = CustomData_add_layer(&me->vdata, CD_MDEFORMVERT, CD_CALLOC, NULL, me->totvert);
-		}
+		/* Note: with vgroups, datalayer is a mere container, we can create it */
+		/* TODO: do not create when not needed (i.e. !use_create and no already existing vgroup), will be done in ongoing refactor. */
+		data_dst = CustomData_add_layer(cd_dst, CD_MDEFORMVERT, CD_CALLOC, NULL, num_elem_dst);
 	}
 	else {
 		/* If dest is a derivedmesh, we do not want to overwrite cdlayers of org mesh! */
 		if (dup_dst) {
-			data_dst = CustomData_duplicate_referenced_layer(cd_dst, CD_MDEFORMVERT, num_create);
+			data_dst = CustomData_duplicate_referenced_layer(cd_dst, CD_MDEFORMVERT, num_elem_dst);
 		}
 		else {
 			data_dst = CustomData_get_layer(cd_dst, CD_MDEFORMVERT);
@@ -1236,7 +1230,7 @@ bool data_transfer_layersmapping_vgroups(
 		else if (tolayers == DT_LAYERS_ACTIVE_DST) {
 			if ((idx_dst = ob_dst->actdef - 1) == -1) {
 				bDeformGroup *dg_src;
-				if (!num_create) {
+				if (!use_create) {
 					return false;
 				}
 				dg_src = BLI_findlink(&ob_src->defbase, idx_src);
@@ -1249,7 +1243,7 @@ bool data_transfer_layersmapping_vgroups(
 			int num = BLI_listbase_count(&ob_src->defbase);
 			idx_dst = idx_src;
 			if (num <= idx_dst) {
-				if (!num_create) {
+				if (!use_create) {
 					return false;
 				}
 				/* Create as much vgroups as necessary! */
@@ -1262,7 +1256,7 @@ bool data_transfer_layersmapping_vgroups(
 		else if (tolayers == DT_LAYERS_NAME_DST) {
 			bDeformGroup *dg_src = BLI_findlink(&ob_src->defbase, idx_src);
 			if ((idx_dst = defgroup_name_index(ob_dst, dg_src->name)) == -1) {
-				if (!num_create) {
+				if (!use_create) {
 					return false;
 				}
 				BKE_defgroup_new(ob_dst, dg_src->name);
@@ -1299,9 +1293,9 @@ bool data_transfer_layersmapping_vgroups(
 		}
 
 		if (use_layers_src) {
-			ret = data_transfer_layersmapping_vgroups_multisrc_to_dst(r_map, mix_mode, mix_factor, mix_weights, num_create,
-			                                                          ob_src, ob_dst, data_src, data_dst, dup_dst,
-			                                                          tolayers, use_layers_src, num_src);
+			ret = data_transfer_layersmapping_vgroups_multisrc_to_dst(
+			        r_map, mix_mode, mix_factor, mix_weights, num_elem_dst, use_create,
+			        ob_src, ob_dst, data_src, data_dst, dup_dst,tolayers, use_layers_src, num_src);
 		}
 
 		MEM_SAFE_FREE(use_layers_src);

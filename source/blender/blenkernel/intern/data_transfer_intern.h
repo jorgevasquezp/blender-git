@@ -53,7 +53,7 @@ void data_transfer_layersmapping_add_item(
 
 bool data_transfer_layersmapping_vgroups(
         struct ListBase *r_map, const int mix_mode, const float mix_factor,
-        const float *mix_weights, const int num_create,
+        const float *mix_weights, const int num_elem_dst, const bool use_create,
         struct Object *ob_src, struct Object *ob_dst, struct CustomData *cd_src, struct CustomData *cd_dst,
         const bool dup_dst, const int fromlayers, const int tolayers);
 
