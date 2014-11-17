@@ -74,7 +74,7 @@ void BKE_mesh_remap_free(MeshPairRemap *map)
 }
 
 static void mesh_remap_item_define(
-        MeshPairRemap *map, const int index, const float hit_distance, const int island,
+        MeshPairRemap *map, const int index, const float UNUSED(hit_dist), const int island,
         const int sources_num, const int *indices_src, const float *weights_src)
 {
 	MeshPairRemapItem *mapit = &map->items[index];
@@ -92,7 +92,8 @@ static void mesh_remap_item_define(
 		mapit->indices_src = NULL;
 		mapit->weights_src = NULL;
 	}
-	mapit->hit_distance = hit_distance;
+	/* UNUSED */
+	// mapit->hit_dist = hit_dist;
 	mapit->island = island;
 }
 
@@ -254,7 +255,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 				        &treedata, &nearest, space_transform,
 				        tmp_co, max_dist_sq);
 
-				if (nearest.index >= 0) {
+				if (nearest.index != -1) {
 					mesh_remap_item_define(r_map, i, hitdist, 0, 1, &nearest.index, &full_weight);
 				}
 				else {
@@ -280,7 +281,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 				        &treedata, &nearest, space_transform,
 				        tmp_co, max_dist_sq);
 
-				if (nearest.index >= 0) {
+				if (nearest.index != -1) {
 					MEdge *me = &edges_src[nearest.index];
 					float (*v1cos)[3] = &vcos_src[me->v1];
 					float (*v2cos)[3] = &vcos_src[me->v2];
@@ -343,7 +344,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 					        &treedata, &rayhit, space_transform,
 					        tmp_co, tmp_no, ray_radius, max_dist);
 
-					if (rayhit.index >= 0 && hitdist <= max_dist) {
+					if ((rayhit.index != -1) && (hitdist <= max_dist)) {
 						MPoly *mp_src = &polys_src[orig_poly_index_src[rayhit.index]];
 						const int sources_num = mesh_remap_interp_poly_data_get(
 						        mp_src, loops_src, (const float (*)[3])vcos_src, rayhit.co,
@@ -370,7 +371,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 					        &treedata, &nearest, space_transform,
 					        tmp_co, max_dist_sq);
 
-					if (nearest.index >= 0) {
+					if (nearest.index != -1) {
 						MPoly *mp = &polys_src[orig_poly_index_src[nearest.index]];
 
 						if (mode == MREMAP_MODE_VERT_POLY_NEAREST) {
@@ -476,7 +477,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 						        &treedata, &nearest, space_transform,
 						        tmp_co, max_dist_sq);
 
-						if (nearest.index >= 0) {
+						if (nearest.index != -1) {
 							v_dst2src_map[vidx_dst][0] = hitdist;
 							v_dst2src_map[vidx_dst][1] = (float)nearest.index;
 						}
@@ -567,7 +568,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				          &treedata, &nearest, space_transform,
 				          tmp_co, max_dist_sq);
 
-				if (nearest.index >= 0) {
+				if (nearest.index != -1) {
 					mesh_remap_item_define(r_map, i, hitdist, 0, 1, &nearest.index, &full_weight);
 				}
 				else {
@@ -597,7 +598,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				          &treedata, &nearest, space_transform,
 				          tmp_co, max_dist_sq);
 
-				if (nearest.index >= 0) {
+				if (nearest.index != -1) {
 					MPoly *mp_src = &polys_src[orig_poly_index_src[nearest.index]];
 					MLoop *ml_src = &loops_src[mp_src->loopstart];
 					int nloops = mp_src->totloop;
@@ -698,7 +699,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 						        &treedata, &rayhit, NULL,
 						        tmp_co, tmp_no, ray_radius / w, max_dist);
 
-						if (rayhit.index >= 0 && hitdist <= max_dist) {
+						if ((rayhit.index != -1) && (hitdist <= max_dist)) {
 							weights[rayhit.index] += w;
 							totweights += w;
 							hitdist_accum += hitdist;
@@ -1023,7 +1024,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						          tdata, &nearest, space_transform,
 						          tmp_co, max_dist_sq);
 
-						if (nearest.index >= 0) {
+						if (nearest.index != -1) {
 							float (*nor_dst)[3];
 							float (*nors_src)[3];
 							float best_nor_dot = -2.0f;
@@ -1085,7 +1086,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							        tdata, &rayhit, space_transform,
 							        tmp_co, tmp_no, ray_radius / w, max_dist);
 
-							if (rayhit.index >= 0 && hitdist <= max_dist) {
+							if ((rayhit.index != -1) && (hitdist <= max_dist)) {
 								islands_res[tindex][plidx_dst].factor = (hitdist ? (1.0f / hitdist) : 1e18f) * w;
 								islands_res[tindex][plidx_dst].hit_distance = hitdist;
 								islands_res[tindex][plidx_dst].index_src = orig_poly_index_src[rayhit.index];
@@ -1112,7 +1113,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						        tdata, &nearest, space_transform,
 						        tmp_co, max_dist_sq);
 
-						if (nearest.index >= 0) {
+						if (nearest.index != -1) {
 							islands_res[tindex][plidx_dst].factor = hitdist ? (1.0f / hitdist) : 1e18f;
 							islands_res[tindex][plidx_dst].hit_distance = hitdist;
 							islands_res[tindex][plidx_dst].index_src = orig_poly_index_src[nearest.index];
@@ -1314,7 +1315,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 				        &treedata, &nearest, space_transform,
 				        tmp_co, max_dist_sq);
 
-				if (nearest.index >= 0) {
+				if (nearest.index != -1) {
 					mesh_remap_item_define(
 					        r_map, i, hitdist, 0,
 					        1, &orig_poly_index_src[nearest.index], &full_weight);
@@ -1339,7 +1340,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 				        &treedata, &rayhit, space_transform,
 				        tmp_co, tmp_no, ray_radius, max_dist);
 
-				if (rayhit.index >= 0 && hitdist <= max_dist) {
+				if ((rayhit.index != -1) && (hitdist <= max_dist)) {
 					mesh_remap_item_define(
 					        r_map, i, rayhit.dist, 0,
 					        1, &orig_poly_index_src[rayhit.index], &full_weight);
@@ -1486,7 +1487,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 							        &treedata, &rayhit, NULL,
 							        tmp_co, tmp_no, ray_radius / w, max_dist);
 
-							if (rayhit.index >= 0 && hitdist <= max_dist) {
+							if ((rayhit.index != -1) && (hitdist <= max_dist)) {
 								weights[orig_poly_index_src[rayhit.index]] += w;
 								totweights += w;
 								hitdist_accum += hitdist;

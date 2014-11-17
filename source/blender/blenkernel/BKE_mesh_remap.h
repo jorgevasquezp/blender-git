@@ -36,7 +36,8 @@ typedef struct MeshPairRemapItem {
 	int    sources_num;
 	int   *indices_src;     /* NULL if no source found. */
 	float *weights_src;     /* NULL if no source found, else, always normalized! */
-	float  hit_distance;    /* FLT_MAX if irrelevant or no source found. */
+	/* UNUSED (at the moment)*/
+	// float  hit_dist;     /* FLT_MAX if irrelevant or no source found. */
 	int    island;          /* For loops only. */
 } MeshPairRemapItem;
 
