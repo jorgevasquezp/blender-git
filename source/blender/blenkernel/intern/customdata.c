@@ -3583,7 +3583,7 @@ static bool check_bit_flag(void *data, const size_t data_size, const uint64_t fl
 }
 
 static void customdata_data_transfer_interp_generic(
-        const DataTransferLayerMapping *laymap, void *data_dst, void **sources, const float *weights, const int count,
+        const CustomDataTransferLayerMap *laymap, void *data_dst, void **sources, const float *weights, const int count,
         const float mix_factor)
 {
 	/* Fake interpolation, we actually copy highest weighted source to dest.
@@ -3688,10 +3688,10 @@ static void customdata_data_transfer_interp_generic(
 	MEM_freeN(tmp_dst);
 }
 
-void CustomData_data_transfer(const MeshPairRemap *m2mmap, const DataTransferLayerMapping *laymap)
+void CustomData_data_transfer(const MeshPairRemap *me_remap, const CustomDataTransferLayerMap *laymap)
 {
-	MeshPairRemapItem *mapit = m2mmap->items;
-	const int totelem = m2mmap->items_num;
+	MeshPairRemapItem *mapit = me_remap->items;
+	const int totelem = me_remap->items_num;
 	int i;
 
 	const int data_type = laymap->data_type;

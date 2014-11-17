@@ -373,12 +373,14 @@ void CustomData_external_reload(struct CustomData *data,
 /* Mesh-to-mesh transfer data. */
 
 struct MeshPairRemap;
-typedef struct DataTransferLayerMapping DataTransferLayerMapping;
+typedef struct CustomDataTransferLayerMap CustomDataTransferLayerMap;
 
-typedef void (*cd_datatransfer_interp)(const DataTransferLayerMapping *laymap, void *dest,
-                                       void **sources, const float *weights, const int count, const float mix_factor);
+typedef void (*cd_datatransfer_interp)(
+        const CustomDataTransferLayerMap *laymap, void *dest,
+        void **sources, const float *weights, const int count, const float mix_factor);
 
-/* Fake CD_LAYERS (those are actually 'real' data stored directly into elements' structs, or otherwise not (directly)
+/**
+ * Fake CD_LAYERS (those are actually 'real' data stored directly into elements' structs, or otherwise not (directly)
  * accessible to usual CDLayer system). */
 enum {
 	CD_FAKE             = 1 << 8,
@@ -420,8 +422,8 @@ enum {
 	/* etc. etc. */
 };
 
-typedef struct DataTransferLayerMapping {
-	DataTransferLayerMapping *next, *prev;
+typedef struct CustomDataTransferLayerMap {
+	CustomDataTransferLayerMap *next, *prev;
 
 	int data_type;
 	int mix_mode;
@@ -439,10 +441,10 @@ typedef struct DataTransferLayerMapping {
 	uint64_t data_flag;  /* For bitflag transfer, flag(s) to affect in transfered data. */
 
 	cd_datatransfer_interp interp;
-} DataTransferLayerMapping;
+} CustomDataTransferLayerMap;
 
 /* Those functions assume src_n and dst_n layers of given type exist in resp. src and dst. */
-void CustomData_data_transfer(const struct MeshPairRemap *m2mmap, const DataTransferLayerMapping *laymap);
+void CustomData_data_transfer(const struct MeshPairRemap *me_remap, const CustomDataTransferLayerMap *laymap);
 
 #ifdef __cplusplus
 }

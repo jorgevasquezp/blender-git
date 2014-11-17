@@ -286,7 +286,7 @@ float data_transfer_interp_float_do(
 	return interpf(val_ret, val_dst, mix_factor);
 }
 
-static void data_transfer_interp_char(const DataTransferLayerMapping *laymap, void *dest,
+static void data_transfer_interp_char(const CustomDataTransferLayerMap *laymap, void *dest,
                                       void **sources, const float *weights, const int count, const float mix_factor)
 {
 	char **data_src = (char **)sources;
@@ -317,7 +317,7 @@ void data_transfer_layersmapping_add_item(
         const size_t elem_size, const size_t data_size, const size_t data_offset, const uint64_t data_flag,
         cd_datatransfer_interp interp)
 {
-	DataTransferLayerMapping *item = MEM_mallocN(sizeof(*item), __func__);
+	CustomDataTransferLayerMap *item = MEM_mallocN(sizeof(*item), __func__);
 
 	BLI_assert(data_dst != NULL);
 
@@ -881,7 +881,7 @@ bool BKE_object_data_transfer_dm(
 			        cddata_type, mix_mode, mix_factor, weights[VDATA],
 			        num_create, fromlayers, tolayers))
 			{
-				DataTransferLayerMapping *lay_mapit;
+				CustomDataTransferLayerMap *lay_mapit;
 
 				changed = (lay_map.first != NULL);
 
@@ -925,7 +925,7 @@ bool BKE_object_data_transfer_dm(
 			        cddata_type, mix_mode, mix_factor, weights[EDATA],
 			        num_create, fromlayers, tolayers))
 			{
-				DataTransferLayerMapping *lay_mapit;
+				CustomDataTransferLayerMap *lay_mapit;
 
 				changed = (lay_map.first != NULL);
 
@@ -979,7 +979,7 @@ bool BKE_object_data_transfer_dm(
 			        cddata_type, mix_mode, mix_factor, weights[LDATA],
 			        num_create, fromlayers, tolayers))
 			{
-				DataTransferLayerMapping *lay_mapit;
+				CustomDataTransferLayerMap *lay_mapit;
 
 				changed = (lay_map.first != NULL);
 
@@ -1027,7 +1027,7 @@ bool BKE_object_data_transfer_dm(
 			        cddata_type, mix_mode, mix_factor, weights[PDATA],
 			        num_create, fromlayers, tolayers))
 			{
-				DataTransferLayerMapping *lay_mapit;
+				CustomDataTransferLayerMap *lay_mapit;
 
 				changed = (lay_map.first != NULL);
 

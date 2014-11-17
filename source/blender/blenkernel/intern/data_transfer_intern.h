@@ -31,7 +31,7 @@
 #ifndef __DATA_TRANSFER_INTERN_H__
 #define __DATA_TRANSFER_INTERN_H__
 
-struct DataTransferLayerMapping;
+struct CustomDataTransferLayerMap;
 struct CustomData;
 struct ListBase;
 
@@ -39,7 +39,7 @@ float data_transfer_interp_float_do(
         const int mix_mode, const float val_dst, const float val_src, const float mix_factor);
 
 /* Copied from BKE_customdata.h :( */
-typedef void (*cd_datatransfer_interp)(const struct DataTransferLayerMapping *laymap, void *dest,
+typedef void (*cd_datatransfer_interp)(const struct CustomDataTransferLayerMap *laymap, void *dest,
                                        void **sources, const float *weights, const int count, const float mix_factor);
 
 void data_transfer_layersmapping_add_item(
