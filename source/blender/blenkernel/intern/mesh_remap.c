@@ -461,19 +461,19 @@ void BKE_mesh_remap_calc_edges_from_dm(
 			MEdge *edges_src = dm_src->getEdgeArray(dm_src);
 			float (*vcos_src)[3] = MEM_mallocN(sizeof(*vcos_src) * (size_t)dm_src->getNumVerts(dm_src), __func__);
 
-			MeshElemMap *vert2edge_src_map;
-			int *vert2edge_src_map_mem;
+			MeshElemMap *vert_to_edge_src_map;
+			int         *vert_to_edge_src_map_mem;
 
 			struct {
 				float hit_dist;
 				int   index;
-			} *v_dst2src_map = MEM_mallocN(sizeof(*v_dst2src_map) * (size_t)numverts_dst, __func__);
+			} *v_dst_to_src_map = MEM_mallocN(sizeof(*v_dst_to_src_map) * (size_t)numverts_dst, __func__);
 
 			for (i = 0; i < numverts_dst; i++) {
-				v_dst2src_map[i].hit_dist = -1.0f;
+				v_dst_to_src_map[i].hit_dist = -1.0f;
 			}
 
-			BKE_mesh_vert_edge_map_create(&vert2edge_src_map, &vert2edge_src_map_mem,
+			BKE_mesh_vert_edge_map_create(&vert_to_edge_src_map, &vert_to_edge_src_map_mem,
 			                              edges_src, num_verts_src, num_edges_src);
 
 			dm_src->getVertCos(dm_src, vcos_src);
@@ -491,7 +491,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 					const unsigned int vidx_dst = j ? e_dst->v1 : e_dst->v2;
 
 					/* Compute closest verts only once! */
-					if (v_dst2src_map[vidx_dst].hit_dist == -1.0f) {
+					if (v_dst_to_src_map[vidx_dst].hit_dist == -1.0f) {
 						float tmp_co[3];
 
 						copy_v3_v3(tmp_co, verts_dst[vidx_dst].co);
@@ -500,12 +500,12 @@ void BKE_mesh_remap_calc_edges_from_dm(
 						        &treedata, &nearest, space_transform,
 						        tmp_co, max_dist_sq, &hit_dist))
 						{
-							v_dst2src_map[vidx_dst].hit_dist = hit_dist;
-							v_dst2src_map[vidx_dst].index = nearest.index;
+							v_dst_to_src_map[vidx_dst].hit_dist = hit_dist;
+							v_dst_to_src_map[vidx_dst].index = nearest.index;
 						}
 						else {
 							/* No source for this dest vert! */
-							v_dst2src_map[vidx_dst].hit_dist = FLT_MAX;
+							v_dst_to_src_map[vidx_dst].hit_dist = FLT_MAX;
 						}
 					}
 				}
@@ -514,16 +514,16 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				 * total verts-to-verts distance. */
 				for (j = 2; j--;) {
 					const unsigned int vidx_dst = j ? e_dst->v1 : e_dst->v2;
-					const float first_dist = v_dst2src_map[vidx_dst].hit_dist;
-					const int vidx_src = v_dst2src_map[vidx_dst].index;
+					const float first_dist = v_dst_to_src_map[vidx_dst].hit_dist;
+					const int vidx_src = v_dst_to_src_map[vidx_dst].index;
 					int *eidx_src, k;
 
 					if (vidx_src < 0) {
 						continue;
 					}
 
-					eidx_src = vert2edge_src_map[vidx_src].indices;
-					k = vert2edge_src_map[vidx_src].count;
+					eidx_src = vert_to_edge_src_map[vidx_src].indices;
+					k = vert_to_edge_src_map[vidx_src].count;
 
 					for (; k--; eidx_src++) {
 						MEdge *e_src = &edges_src[*eidx_src];
@@ -573,9 +573,9 @@ void BKE_mesh_remap_calc_edges_from_dm(
 			}
 
 			MEM_freeN(vcos_src);
-			MEM_freeN(v_dst2src_map);
-			MEM_freeN(vert2edge_src_map);
-			MEM_freeN(vert2edge_src_map_mem);
+			MEM_freeN(v_dst_to_src_map);
+			MEM_freeN(vert_to_edge_src_map);
+			MEM_freeN(vert_to_edge_src_map_mem);
 		}
 		else if (mode == MREMAP_MODE_EDGE_NEAREST) {
 			bvhtree_from_mesh_edges(&treedata, dm_src, 0.0f, 2, 6);
@@ -1081,7 +1081,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									}
 								}
 							}
-							islands_res[tindex][plidx_dst].factor = hit_dist ? (1.0f / hit_dist * best_nor_dot) : 1e18f;
+							islands_res[tindex][plidx_dst].factor = hit_dist ? (1.0f / (hit_dist * best_nor_dot)) : 1e18f;
 							islands_res[tindex][plidx_dst].hit_dist = hit_dist;
 							islands_res[tindex][plidx_dst].index_src = best_index_src;
 						}
