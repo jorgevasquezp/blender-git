@@ -464,9 +464,14 @@ void BKE_mesh_remap_calc_edges_from_dm(
 			MeshElemMap *vert2edge_src_map;
 			int *vert2edge_src_map_mem;
 
-			/* Note we store an integer index in second element (first one is hit_dist). */
-			float (*v_dst2src_map)[2] = MEM_mallocN(sizeof(*v_dst2src_map) * (size_t)numverts_dst, __func__);
-			fill_vn_fl((float *)v_dst2src_map, numverts_dst * 2, -1.0f);
+			struct {
+				float hit_dist;
+				int   index;
+			} *v_dst2src_map = MEM_mallocN(sizeof(*v_dst2src_map) * (size_t)numverts_dst, __func__);
+
+			for (i = 0; i < numverts_dst; i++) {
+				v_dst2src_map[i].hit_dist = -1.0f;
+			}
 
 			BKE_mesh_vert_edge_map_create(&vert2edge_src_map, &vert2edge_src_map_mem,
 			                              edges_src, num_verts_src, num_edges_src);
@@ -486,7 +491,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 					const unsigned int vidx_dst = j ? e_dst->v1 : e_dst->v2;
 
 					/* Compute closest verts only once! */
-					if (v_dst2src_map[vidx_dst][0] < 0.0f) {
+					if (v_dst2src_map[vidx_dst].hit_dist == -1.0f) {
 						float tmp_co[3];
 
 						copy_v3_v3(tmp_co, verts_dst[vidx_dst].co);
@@ -495,12 +500,12 @@ void BKE_mesh_remap_calc_edges_from_dm(
 						        &treedata, &nearest, space_transform,
 						        tmp_co, max_dist_sq, &hit_dist))
 						{
-							v_dst2src_map[vidx_dst][0] = hit_dist;
-							v_dst2src_map[vidx_dst][1] = (float)nearest.index;
+							v_dst2src_map[vidx_dst].hit_dist = hit_dist;
+							v_dst2src_map[vidx_dst].index = nearest.index;
 						}
 						else {
 							/* No source for this dest vert! */
-							v_dst2src_map[vidx_dst][0] = FLT_MAX;
+							v_dst2src_map[vidx_dst].hit_dist = FLT_MAX;
 						}
 					}
 				}
@@ -509,8 +514,8 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				 * total verts-to-verts distance. */
 				for (j = 2; j--;) {
 					const unsigned int vidx_dst = j ? e_dst->v1 : e_dst->v2;
-					const float first_dist = v_dst2src_map[vidx_dst][0];
-					const int vidx_src = (int)v_dst2src_map[vidx_dst][1];
+					const float first_dist = v_dst2src_map[vidx_dst].hit_dist;
+					const int vidx_src = v_dst2src_map[vidx_dst].index;
 					int *eidx_src, k;
 
 					if (vidx_src < 0) {
