@@ -69,9 +69,9 @@ static void initData(ModifierData *md)
 	dtmd->map_max_distance   = 1.0f;
 	dtmd->map_ray_radius     = 0.0f;
 
-	for (i = 0; i < DT_MULTILAYER_IDX_MAX; i++) {
-		dtmd->fromlayers_selmode[i] = DT_FROMLAYERS_ALL;
-		dtmd->tolayers_selmode[i]   = DT_TOLAYERS_NAME;
+	for (i = 0; i < DT_MULTILAYER_INDEX_MAX; i++) {
+		dtmd->layers_select_src[i] = DT_LAYERS_ALL_SRC;
+		dtmd->layers_select_dst[i]   = DT_LAYERS_NAME_DST;
 	}
 
 	dtmd->mix_mode           = CDT_MIX_TRANSFER;
@@ -91,7 +91,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 		dataMask |= CD_MASK_MDEFORMVERT;
 	}
 
-	dataMask |= BKE_data_transfer_dttypes_to_cdmask(dtmd->data_types);
+	dataMask |= BKE_object_data_transfer_dttypes_to_cdmask(dtmd->data_types);
 
 	return dataMask;
 }
@@ -99,7 +99,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 static bool dependsOnNormals(ModifierData *md)
 {
 	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	int item_types = BKE_data_transfer_get_dttypes_item_types(dtmd->data_types);
+	int item_types = BKE_object_data_transfer_get_dttypes_item_types(dtmd->data_types);
 
 	if ((item_types & ME_VERT) && (dtmd->vmap_mode & (M2MMAP_USE_NORPROJ | M2MMAP_USE_NORMAL))) {
 		return true;
@@ -172,10 +172,10 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 
 	BKE_reports_init(&reports, RPT_STORE);
 
-	BKE_data_transfer_dm(md->scene, dtmd->ob_source, ob, dm, dtmd->data_types, use_create,
+	BKE_object_data_transfer_dm(md->scene, dtmd->ob_source, ob, dm, dtmd->data_types, use_create,
 	                     dtmd->vmap_mode, dtmd->emap_mode, dtmd->lmap_mode, dtmd->pmap_mode,
 	                     space_transform, max_dist, dtmd->map_ray_radius,
-	                     dtmd->fromlayers_selmode, dtmd->tolayers_selmode,
+	                     dtmd->layers_select_src, dtmd->layers_select_dst,
 	                     dtmd->mix_mode, dtmd->mix_factor, dtmd->defgrp_name, invert_vgroup, &reports);
 
 	if (BKE_reports_contain(&reports, RPT_ERROR)) {

@@ -56,7 +56,7 @@
 #include "data_transfer_intern.h"
 
 
-CustomDataMask BKE_data_transfer_dttypes_to_cdmask(const int dtdata_types)
+CustomDataMask BKE_object_data_transfer_dttypes_to_cdmask(const int dtdata_types)
 {
 	CustomDataMask cddata_mask = 0;
 	int i;
@@ -69,7 +69,7 @@ CustomDataMask BKE_data_transfer_dttypes_to_cdmask(const int dtdata_types)
 			continue;
 		}
 
-		cddata_type = BKE_data_transfer_dttype_to_cdtype(dtdata_type);
+		cddata_type = BKE_object_data_transfer_dttype_to_cdtype(dtdata_type);
 		if (!(cddata_type & CD_FAKE)) {
 			cddata_mask |= 1LL << cddata_type;
 		}
@@ -85,7 +85,7 @@ CustomDataMask BKE_data_transfer_dttypes_to_cdmask(const int dtdata_types)
 }
 
 /* Check what can do each layer type (if it is actually handled by transferdata, if it supports advanced mixing... */
-bool BKE_data_transfer_get_dttypes_capacity(
+bool BKE_object_data_transfer_get_dttypes_capacity(
         const int dtdata_types, bool *r_advanced_mixing, bool *r_threshold)
 {
 	int i;
@@ -103,49 +103,49 @@ bool BKE_data_transfer_get_dttypes_capacity(
 
 		switch (dtdata_type) {
 		/* Vertex data */
-			case DT_DATA_MDEFORMVERT:
+			case DT_TYPE_MDEFORMVERT:
 				*r_advanced_mixing = true;
 				*r_threshold = true;
 				ret = true;
 				break;
-			case DT_DATA_SKIN:
+			case DT_TYPE_SKIN:
 				*r_threshold = true;
 				ret = true;
 				break;
-			case DT_DATA_BWEIGHT_VERT:
+			case DT_TYPE_BWEIGHT_VERT:
 				ret = true;
 				break;
 		/* Edge data */
-			case DT_DATA_SHARP_EDGE:
+			case DT_TYPE_SHARP_EDGE:
 				*r_threshold = true;
 				ret = true;
 				break;
-			case DT_DATA_SEAM:
+			case DT_TYPE_SEAM:
 				*r_threshold = true;
 				ret = true;
 				break;
-			case DT_DATA_CREASE:
+			case DT_TYPE_CREASE:
 				ret = true;
 				break;
-			case DT_DATA_BWEIGHT_EDGE:
+			case DT_TYPE_BWEIGHT_EDGE:
 				ret = true;
 				break;
-			case DT_DATA_FREESTYLE_EDGE:
+			case DT_TYPE_FREESTYLE_EDGE:
 				ret = true;
 				break;
 		/* Loop/Poly data */
-			case DT_DATA_UV:
+			case DT_TYPE_UV:
 				ret = true;
 				break;
-			case DT_DATA_VCOL:
+			case DT_TYPE_VCOL:
 				*r_advanced_mixing = true;
 				*r_threshold = true;
 				ret = true;
 				break;
-			case DT_DATA_SHARP_FACE:
+			case DT_TYPE_SHARP_FACE:
 				ret = true;
 				break;
-			case DT_DATA_FREESTYLE_FACE:
+			case DT_TYPE_FREESTYLE_FACE:
 				ret = true;
 				break;
 		}
@@ -154,7 +154,7 @@ bool BKE_data_transfer_get_dttypes_capacity(
 	return ret;
 }
 
-int BKE_data_transfer_get_dttypes_item_types(const int dtdata_types)
+int BKE_object_data_transfer_get_dttypes_item_types(const int dtdata_types)
 {
 	int i, ret = 0;
 
@@ -182,37 +182,37 @@ int BKE_data_transfer_get_dttypes_item_types(const int dtdata_types)
 	return ret;
 }
 
-int BKE_data_transfer_dttype_to_cdtype(const int dtdata_type)
+int BKE_object_data_transfer_dttype_to_cdtype(const int dtdata_type)
 {
 	switch (dtdata_type) {
-		case DT_DATA_MDEFORMVERT:
+		case DT_TYPE_MDEFORMVERT:
 			return CD_FAKE_MDEFORMVERT;
-		case DT_DATA_SHAPEKEY:
+		case DT_TYPE_SHAPEKEY:
 			return CD_FAKE_SHAPEKEY;
-		case DT_DATA_SKIN:
+		case DT_TYPE_SKIN:
 			return CD_MVERT_SKIN;
-		case DT_DATA_BWEIGHT_VERT:
+		case DT_TYPE_BWEIGHT_VERT:
 			return CD_FAKE_BWEIGHT;
 
-		case DT_DATA_SHARP_EDGE:
+		case DT_TYPE_SHARP_EDGE:
 			return CD_FAKE_SHARP;
-		case DT_DATA_SEAM:
+		case DT_TYPE_SEAM:
 			return CD_FAKE_SEAM;
-		case DT_DATA_CREASE:
+		case DT_TYPE_CREASE:
 			return CD_FAKE_CREASE;
-		case DT_DATA_BWEIGHT_EDGE:
+		case DT_TYPE_BWEIGHT_EDGE:
 			return CD_FAKE_BWEIGHT;
-		case DT_DATA_FREESTYLE_EDGE:
+		case DT_TYPE_FREESTYLE_EDGE:
 			return CD_FREESTYLE_EDGE;
 
-		case DT_DATA_UV:
+		case DT_TYPE_UV:
 			return CD_FAKE_UV;
-		case DT_DATA_SHARP_FACE:
+		case DT_TYPE_SHARP_FACE:
 			return CD_FAKE_SHARP;
-		case DT_DATA_FREESTYLE_FACE:
+		case DT_TYPE_FREESTYLE_FACE:
 			return CD_FREESTYLE_FACE;
 
-		case DT_DATA_VCOL:
+		case DT_TYPE_VCOL:
 			return CD_MLOOPCOL;
 
 		default:
@@ -221,19 +221,19 @@ int BKE_data_transfer_dttype_to_cdtype(const int dtdata_type)
 	return 0;  /* Should never be reached! */
 }
 
-int BKE_data_transfer_dttype_to_fromto_idx(const int dtdata_type)
+int BKE_object_data_transfer_dttype_to_srcdst_index(const int dtdata_type)
 {
 	switch (dtdata_type) {
-		case DT_DATA_MDEFORMVERT:
-			return DT_MULTILAYER_IDX_MDEFORMVERT;
-		case DT_DATA_SHAPEKEY:
-			return DT_MULTILAYER_IDX_SHAPEKEY;
-		case DT_DATA_UV:
-			return DT_MULTILAYER_IDX_UV;
-		case DT_DATA_VCOL:
-			return DT_MULTILAYER_IDX_VCOL;
+		case DT_TYPE_MDEFORMVERT:
+			return DT_MULTILAYER_INDEX_MDEFORMVERT;
+		case DT_TYPE_SHAPEKEY:
+			return DT_MULTILAYER_INDEX_SHAPEKEY;
+		case DT_TYPE_UV:
+			return DT_MULTILAYER_INDEX_UV;
+		case DT_TYPE_VCOL:
+			return DT_MULTILAYER_INDEX_VCOL;
 		default:
-			return DT_MULTILAYER_IDX_INVALID;
+			return DT_MULTILAYER_INDEX_INVALID;
 	}
 }
 
@@ -345,8 +345,9 @@ static void data_transfer_layersmapping_add_item_cd(
         ListBase *r_map, const int cddata_type, const int mix_mode, const float mix_factor, const float *mix_weights,
         void *data_src, void *data_dst)
 {
-	data_transfer_layersmapping_add_item(r_map, cddata_type, mix_mode, mix_factor, mix_weights, data_src, data_dst,
-	                                     0, 0, 0, 0, 0, 0, NULL);
+	data_transfer_layersmapping_add_item(
+	        r_map, cddata_type, mix_mode, mix_factor, mix_weights, data_src, data_dst,
+	        0, 0, 0, 0, 0, 0, NULL);
 }
 
 static bool data_transfer_layersmapping_cdlayers_multisrc_to_dst(
@@ -359,7 +360,7 @@ static bool data_transfer_layersmapping_cdlayers_multisrc_to_dst(
 	int idx_dst;
 
 	switch (tolayers) {
-		case DT_TOLAYERS_INDEX:
+		case DT_LAYERS_INDEX_DST:
 			{
 				idx_dst = CustomData_number_of_layers(data_dst, cddata_type);
 
@@ -388,7 +389,7 @@ static bool data_transfer_layersmapping_cdlayers_multisrc_to_dst(
 				}
 			}
 			break;
-		case DT_TOLAYERS_NAME:
+		case DT_LAYERS_NAME_DST:
 			while (idx_src--) {
 				const char *name;
 
@@ -444,7 +445,7 @@ static bool data_transfer_layersmapping_cdlayers(
 
 		data_transfer_layersmapping_add_item_cd(r_map, cddata_type, mix_mode, mix_factor, mix_weights, data_src, data_dst);
 	}
-	else if (fromlayers == DT_FROMLAYERS_ACTIVE || fromlayers >= 0) {
+	else if (fromlayers == DT_LAYERS_ACTIVE_SRC || fromlayers >= 0) {
 		if (fromlayers >= 0) {  /* Real-layer index */
 			idx_src = fromlayers;
 		}
@@ -462,7 +463,7 @@ static bool data_transfer_layersmapping_cdlayers(
 			idx_dst = tolayers;
 			data_dst = CustomData_get_layer_n(cd_dst, cddata_type, idx_dst);
 		}
-		else if (tolayers == DT_TOLAYERS_ACTIVE) {
+		else if (tolayers == DT_LAYERS_ACTIVE_DST) {
 			if ((idx_dst = CustomData_get_active_layer(cd_dst, cddata_type)) == -1) {
 				if (!num_create) {
 					return false;
@@ -479,7 +480,7 @@ static bool data_transfer_layersmapping_cdlayers(
 				}
 			}
 		}
-		else if (tolayers == DT_TOLAYERS_INDEX) {
+		else if (tolayers == DT_LAYERS_INDEX_DST) {
 			int num = CustomData_number_of_layers(cd_dst, cddata_type);
 			idx_dst = idx_src;
 			if (num <= idx_dst) {
@@ -499,7 +500,7 @@ static bool data_transfer_layersmapping_cdlayers(
 				data_dst = CustomData_get_layer_n(cd_dst, cddata_type, idx_dst);
 			}
 		}
-		else if (tolayers == DT_TOLAYERS_NAME) {
+		else if (tolayers == DT_LAYERS_NAME_DST) {
 			const char *name = CustomData_get_layer_name(cd_src, cddata_type, idx_src);
 			if ((idx_dst = CustomData_get_named_layer(cd_dst, cddata_type, name)) == -1) {
 				if (!num_create) {
@@ -524,19 +525,21 @@ static bool data_transfer_layersmapping_cdlayers(
 			return false;
 		}
 
-		data_transfer_layersmapping_add_item_cd(r_map, cddata_type, mix_mode, mix_factor, mix_weights,
-		                                        data_src, data_dst);
+		data_transfer_layersmapping_add_item_cd(
+		        r_map, cddata_type, mix_mode, mix_factor, mix_weights,
+		        data_src, data_dst);
 	}
-	else if (fromlayers == DT_FROMLAYERS_ALL) {
+	else if (fromlayers == DT_LAYERS_ALL_SRC) {
 		int num_src = CustomData_number_of_layers(cd_src, cddata_type);
 		bool *use_layers_src = MEM_mallocN(sizeof(*use_layers_src) * (size_t)num_src, __func__);
 		bool ret;
 
 		memset(use_layers_src, true, sizeof(*use_layers_src) * num_src);
 
-		ret = data_transfer_layersmapping_cdlayers_multisrc_to_dst(r_map, cddata_type, mix_mode, mix_factor, mix_weights,
-		                                                           num_create, cd_src, cd_dst, dup_dst,
-		                                                           tolayers, use_layers_src, num_src);
+		ret = data_transfer_layersmapping_cdlayers_multisrc_to_dst(
+		        r_map, cddata_type, mix_mode, mix_factor, mix_weights,
+		        num_create, cd_src, cd_dst, dup_dst,
+		        tolayers, use_layers_src, num_src);
 
 		MEM_freeN(use_layers_src);
 		return ret;
@@ -681,12 +684,14 @@ static bool data_transfer_layersmapping_generate(
 			const size_t data_size = sizeof(((MEdge *)NULL)->flag);
 			const size_t data_offset = offsetof(MEdge, flag);
 			const uint64_t data_flag = (cddata_type == CD_FAKE_SHARP) ? ME_SHARP : ME_SEAM;
-			data_transfer_layersmapping_add_item(r_map, cddata_type, mix_mode, mix_factor, mix_weights,
-			                                     dm_src->getEdgeArray(dm_src),
-			                                     dm_dst ? dm_dst->getEdgeArray(dm_dst) : me_dst->medge,
-			                                     dm_src->getNumEdges(dm_src),
-			                                     dm_dst ? dm_dst->getNumEdges(dm_dst) : me_dst->totedge,
-			                                     elem_size, data_size, data_offset, data_flag, NULL);
+
+			data_transfer_layersmapping_add_item(
+			        r_map, cddata_type, mix_mode, mix_factor, mix_weights,
+			        dm_src->getEdgeArray(dm_src),
+			        dm_dst ? dm_dst->getEdgeArray(dm_dst) : me_dst->medge,
+			        dm_src->getNumEdges(dm_src),
+			        dm_dst ? dm_dst->getNumEdges(dm_dst) : me_dst->totedge,
+			        elem_size, data_size, data_offset, data_flag, NULL);
 			return true;
 		}
 		else {
@@ -706,9 +711,10 @@ static bool data_transfer_layersmapping_generate(
 				return false;
 			}
 
-			if (!data_transfer_layersmapping_cdlayers(r_map, cddata_type, mix_mode, mix_factor, mix_weights,
-			                                          num_create, cd_src, cd_dst, dm_dst != NULL,
-			                                          fromlayers, tolayers))
+			if (!data_transfer_layersmapping_cdlayers(
+			        r_map, cddata_type, mix_mode, mix_factor, mix_weights,
+			        num_create, cd_src, cd_dst, dm_dst != NULL,
+			        fromlayers, tolayers))
 			{
 				/* We handle specific source selection cases here. */
 				return false;
@@ -732,9 +738,10 @@ static bool data_transfer_layersmapping_generate(
 				return false;
 			}
 
-			if (!data_transfer_layersmapping_cdlayers(r_map, cddata_type, mix_mode, mix_factor, mix_weights,
-			                                          num_create, cd_src, cd_dst, dm_dst != NULL,
-			                                          fromlayers, tolayers))
+			if (!data_transfer_layersmapping_cdlayers(
+			        r_map, cddata_type, mix_mode, mix_factor, mix_weights,
+			        num_create, cd_src, cd_dst, dm_dst != NULL,
+			        fromlayers, tolayers))
 			{
 				/* We handle specific source selection cases here. */
 				return false;
@@ -746,12 +753,14 @@ static bool data_transfer_layersmapping_generate(
 			const size_t data_size = sizeof(((MPoly *)NULL)->flag);
 			const size_t data_offset = offsetof(MPoly, flag);
 			const uint64_t data_flag = ME_SMOOTH;
-			data_transfer_layersmapping_add_item(r_map, cddata_type, mix_mode, mix_factor, mix_weights,
-			                                     dm_src->getPolyArray(dm_src),
-			                                     dm_dst ? dm_dst->getPolyArray(dm_dst) : me_dst->mpoly,
-			                                     dm_src->getNumPolys(dm_src),
-			                                     dm_dst ? dm_dst->getNumPolys(dm_dst) : me_dst->totpoly,
-			                                     elem_size, data_size, data_offset, data_flag, NULL);
+
+			data_transfer_layersmapping_add_item(
+			        r_map, cddata_type, mix_mode, mix_factor, mix_weights,
+			        dm_src->getPolyArray(dm_src),
+			        dm_dst ? dm_dst->getPolyArray(dm_dst) : me_dst->mpoly,
+			        dm_src->getNumPolys(dm_src),
+			        dm_dst ? dm_dst->getNumPolys(dm_dst) : me_dst->totpoly,
+			        elem_size, data_size, data_offset, data_flag, NULL);
 			return true;
 		}
 		else {
@@ -762,11 +771,11 @@ static bool data_transfer_layersmapping_generate(
 	return false;
 }
 
-bool BKE_data_transfer_dm(
+bool BKE_object_data_transfer_dm(
         Scene *scene, Object *ob_src, Object *ob_dst, DerivedMesh *dm_dst, const int data_types, const bool use_create,
         const int map_vert_mode, const int map_edge_mode, const int map_loop_mode, const int map_poly_mode,
         SpaceTransform *space_transform, const float max_distance, const float ray_radius,
-        const int fromlayers_select[DT_MULTILAYER_IDX_MAX], const int tolayers_select[DT_MULTILAYER_IDX_MAX],
+        const int fromlayers_select[DT_MULTILAYER_INDEX_MAX], const int tolayers_select[DT_MULTILAYER_INDEX_MAX],
         const int mix_mode, const float mix_factor, const char *vgroup_name, const bool invert_vgroup,
         ReportList *reports)
 {
@@ -812,7 +821,7 @@ bool BKE_data_transfer_dm(
 	}
 
 	/* Get source DM.*/
-	dm_src_mask |= BKE_data_transfer_dttypes_to_cdmask(data_types);
+	dm_src_mask |= BKE_object_data_transfer_dttypes_to_cdmask(data_types);
 	/* XXX Hack! In case this is being evaluated from dm stack, we cannot compute final dm,
 	 *     can lead to infinite recursion in case of dependency cycles of DataTransfer modifiers...
 	 *     Issue is, this means we cannot be sure to have requested cd layers in source.
@@ -833,10 +842,10 @@ bool BKE_data_transfer_dm(
 			continue;
 		}
 
-		cddata_type = BKE_data_transfer_dttype_to_cdtype(dtdata_type);
+		cddata_type = BKE_object_data_transfer_dttype_to_cdtype(dtdata_type);
 
-		fromto_idx = BKE_data_transfer_dttype_to_fromto_idx(dtdata_type);
-		if (fromto_idx != DT_MULTILAYER_IDX_INVALID) {
+		fromto_idx = BKE_object_data_transfer_dttype_to_srcdst_index(dtdata_type);
+		if (fromto_idx != DT_MULTILAYER_INDEX_INVALID) {
 			fromlayers = fromlayers_select[fromto_idx];
 			tolayers = tolayers_select[fromto_idx];
 		}
@@ -856,8 +865,9 @@ bool BKE_data_transfer_dm(
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_verts_compute(map_vert_mode, space_transform, max_distance, ray_radius,
-				                                  verts_dst, num_verts_dst, dirty_nors_dst, dm_src, &geom_map[VDATA]);
+				BKE_dm2mesh_mapping_verts_compute(
+				        map_vert_mode, space_transform, max_distance, ray_radius,
+				        verts_dst, num_verts_dst, dirty_nors_dst, dm_src, &geom_map[VDATA]);
 				geom_map_init[VDATA] = true;
 			}
 
@@ -866,9 +876,10 @@ bool BKE_data_transfer_dm(
 				BKE_defvert_extract_vgroup_to_vertweights(mdef, vg_idx, num_verts_dst, weights[VDATA], invert_vgroup);
 			}
 
-			if (data_transfer_layersmapping_generate(&lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_VERT,
-			                                         cddata_type, mix_mode, mix_factor, weights[VDATA],
-			                                         num_create, fromlayers, tolayers))
+			if (data_transfer_layersmapping_generate(
+			        &lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_VERT,
+			        cddata_type, mix_mode, mix_factor, weights[VDATA],
+			        num_create, fromlayers, tolayers))
 			{
 				DataTransferLayerMapping *lay_mapit;
 
@@ -895,21 +906,24 @@ bool BKE_data_transfer_dm(
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_edges_compute(map_edge_mode, space_transform, max_distance, ray_radius,
-				                                  verts_dst, num_verts_dst, edges_dst, num_edges_dst, dirty_nors_dst,
-				                                  dm_src, &geom_map[EDATA]);
+				BKE_dm2mesh_mapping_edges_compute(
+				        map_edge_mode, space_transform, max_distance, ray_radius,
+				        verts_dst, num_verts_dst, edges_dst, num_edges_dst, dirty_nors_dst,
+				        dm_src, &geom_map[EDATA]);
 				geom_map_init[EDATA] = true;
 			}
 
 			if (mdef && vg_idx != -1 && !weights[EDATA]) {
 				weights[EDATA] = MEM_mallocN(sizeof(*weights[EDATA]) * (size_t)num_edges_dst, __func__);
-				BKE_defvert_extract_vgroup_to_edgeweights(mdef, vg_idx, num_verts_dst, edges_dst, num_edges_dst,
-				                                          weights[EDATA], invert_vgroup);
+				BKE_defvert_extract_vgroup_to_edgeweights(
+				        mdef, vg_idx, num_verts_dst, edges_dst, num_edges_dst,
+				        weights[EDATA], invert_vgroup);
 			}
 
-			if (data_transfer_layersmapping_generate(&lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_EDGE,
-			                                         cddata_type, mix_mode, mix_factor, weights[EDATA],
-			                                         num_create, fromlayers, tolayers))
+			if (data_transfer_layersmapping_generate(
+			        &lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_EDGE,
+			        cddata_type, mix_mode, mix_factor, weights[EDATA],
+			        num_create, fromlayers, tolayers))
 			{
 				DataTransferLayerMapping *lay_mapit;
 
@@ -944,23 +958,26 @@ bool BKE_data_transfer_dm(
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_loops_compute(map_loop_mode, space_transform, max_distance, ray_radius,
-				                                  verts_dst, num_verts_dst, edges_dst, num_edges_dst,
-				                                  loops_dst, num_loops_dst, polys_dst, num_polys_dst,
-				                                  ldata_dst, pdata_dst, me_dst->smoothresh, dirty_nors_dst,
-				                                  dm_src, island_callback, &geom_map[LDATA]);
+				BKE_dm2mesh_mapping_loops_compute(
+				        map_loop_mode, space_transform, max_distance, ray_radius,
+				        verts_dst, num_verts_dst, edges_dst, num_edges_dst,
+				        loops_dst, num_loops_dst, polys_dst, num_polys_dst,
+				        ldata_dst, pdata_dst, me_dst->smoothresh, dirty_nors_dst,
+				        dm_src, island_callback, &geom_map[LDATA]);
 				geom_map_init[LDATA] = true;
 			}
 
 			if (mdef && vg_idx != -1 && !weights[LDATA]) {
 				weights[LDATA] = MEM_mallocN(sizeof(*weights[LDATA]) * (size_t)num_loops_dst, __func__);
-				BKE_defvert_extract_vgroup_to_loopweights(mdef, vg_idx, num_verts_dst, loops_dst, num_loops_dst,
-				                                          weights[LDATA], invert_vgroup);
+				BKE_defvert_extract_vgroup_to_loopweights(
+				        mdef, vg_idx, num_verts_dst, loops_dst, num_loops_dst,
+				        weights[LDATA], invert_vgroup);
 			}
 
-			if (data_transfer_layersmapping_generate(&lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_LOOP,
-			                                         cddata_type, mix_mode, mix_factor, weights[LDATA],
-			                                         num_create, fromlayers, tolayers))
+			if (data_transfer_layersmapping_generate(
+			        &lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_LOOP,
+			        cddata_type, mix_mode, mix_factor, weights[LDATA],
+			        num_create, fromlayers, tolayers))
 			{
 				DataTransferLayerMapping *lay_mapit;
 
@@ -990,22 +1007,25 @@ bool BKE_data_transfer_dm(
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_polys_compute(map_poly_mode, space_transform, max_distance, ray_radius,
-				                                  verts_dst, num_verts_dst, loops_dst, num_loops_dst,
-				                                  polys_dst, num_polys_dst, pdata_dst, dirty_nors_dst,
-				                                  dm_src, &geom_map[PDATA]);
+				BKE_dm2mesh_mapping_polys_compute(
+				        map_poly_mode, space_transform, max_distance, ray_radius,
+				        verts_dst, num_verts_dst, loops_dst, num_loops_dst,
+				        polys_dst, num_polys_dst, pdata_dst, dirty_nors_dst,
+				        dm_src, &geom_map[PDATA]);
 				geom_map_init[PDATA] = true;
 			}
 
 			if (mdef && vg_idx != -1 && !weights[PDATA]) {
 				weights[PDATA] = MEM_mallocN(sizeof(*weights[PDATA]) * (size_t)num_polys_dst, __func__);
-				BKE_defvert_extract_vgroup_to_polyweights(mdef, vg_idx, num_verts_dst, loops_dst, num_loops_dst,
-				                                          polys_dst, num_polys_dst, weights[PDATA], invert_vgroup);
+				BKE_defvert_extract_vgroup_to_polyweights(
+				        mdef, vg_idx, num_verts_dst, loops_dst, num_loops_dst,
+				        polys_dst, num_polys_dst, weights[PDATA], invert_vgroup);
 			}
 
-			if (data_transfer_layersmapping_generate(&lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_POLY,
-			                                         cddata_type, mix_mode, mix_factor, weights[PDATA],
-			                                         num_create, fromlayers, tolayers))
+			if (data_transfer_layersmapping_generate(
+			        &lay_map, ob_src, ob_dst, dm_src, dm_dst, me_dst, ME_POLY,
+			        cddata_type, mix_mode, mix_factor, weights[PDATA],
+			        num_create, fromlayers, tolayers))
 			{
 				DataTransferLayerMapping *lay_mapit;
 
@@ -1034,16 +1054,17 @@ bool BKE_data_transfer_dm(
 #undef DATAMAX
 }
 
-bool BKE_data_transfer_mesh(
+bool BKE_object_data_transfer_mesh(
         Scene *scene, Object *ob_src, Object *ob_dst, const int data_types, const bool use_create,
         const int map_vert_mode, const int map_edge_mode, const int map_loop_mode, const int map_poly_mode,
         SpaceTransform *space_transform, const float max_distance, const float ray_radius,
-        const int fromlayers_select[DT_MULTILAYER_IDX_MAX], const int tolayers_select[DT_MULTILAYER_IDX_MAX],
+        const int fromlayers_select[DT_MULTILAYER_INDEX_MAX], const int tolayers_select[DT_MULTILAYER_INDEX_MAX],
         const int mix_mode, const float mix_factor, const char *vgroup_name, const bool invert_vgroup,
         ReportList *reports)
 {
-	return BKE_data_transfer_dm(scene, ob_src, ob_dst, NULL, data_types, use_create,
-	                            map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode, space_transform,
-	                            max_distance, ray_radius, fromlayers_select, tolayers_select,
-	                            mix_mode, mix_factor, vgroup_name, invert_vgroup, reports);
+	return BKE_object_data_transfer_dm(
+	        scene, ob_src, ob_dst, NULL, data_types, use_create,
+	        map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode, space_transform,
+	        max_distance, ray_radius, fromlayers_select, tolayers_select,
+	        mix_mode, mix_factor, vgroup_name, invert_vgroup, reports);
 }

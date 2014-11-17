@@ -64,26 +64,26 @@
 /* Not shared with modifier, since we use a usual enum here, not a multi-choice one. */
 static EnumPropertyItem DT_layer_items[] = {
 	{0, "", 0, "Vertex Data", ""},
-	{DT_DATA_MDEFORMVERT, "VGROUP_WEIGHTS", 0, "Vertex Group(s)", "Transfer active or all vertex groups"},
+	{DT_TYPE_MDEFORMVERT, "VGROUP_WEIGHTS", 0, "Vertex Group(s)", "Transfer active or all vertex groups"},
 #if 0  /* XXX For now, would like to finish/merge work from 2014 gsoc first. */
-	{DT_DATA_SHAPEKEY, "SHAPEKEYS", 0, "Shapekey(s)", "Transfer active or all shape keys"},
+	{DT_TYPE_SHAPEKEY, "SHAPEKEYS", 0, "Shapekey(s)", "Transfer active or all shape keys"},
 #endif
 #if 0  /* XXX When SkinModifier is enabled, it seems to erase its own CD_MVERT_SKIN layer from final DM :( */
-	{DT_DATA_SKIN, "SKIN", 0, "Skin Weight", "Transfer skin weights"},
+	{DT_TYPE_SKIN, "SKIN", 0, "Skin Weight", "Transfer skin weights"},
 #endif
-	{DT_DATA_BWEIGHT_VERT, "BEVEL_WEIGHT_VERT", 0, "Bevel Weight", "Transfer bevel weights"},
+	{DT_TYPE_BWEIGHT_VERT, "BEVEL_WEIGHT_VERT", 0, "Bevel Weight", "Transfer bevel weights"},
 	{0, "", 0, "Edge Data", ""},
-	{DT_DATA_SHARP_EDGE, "SHARP_EDGE", 0, "Sharp", "Transfer sharp mark"},
-	{DT_DATA_SEAM, "SEAM", 0, "UV Seam", "Transfer UV seam mark"},
-	{DT_DATA_CREASE, "CREASE", 0, "Subsurf Crease", "Transfer crease values"},
-	{DT_DATA_BWEIGHT_EDGE, "BEVEL_WEIGHT_EDGE", 0, "Bevel Weight", "Transfer bevel weights"},
-	{DT_DATA_FREESTYLE_EDGE, "FREESTYLE_EDGE", 0, "Freestyle Mark", "Transfer Freestyle edge mark"},
+	{DT_TYPE_SHARP_EDGE, "SHARP_EDGE", 0, "Sharp", "Transfer sharp mark"},
+	{DT_TYPE_SEAM, "SEAM", 0, "UV Seam", "Transfer UV seam mark"},
+	{DT_TYPE_CREASE, "CREASE", 0, "Subsurf Crease", "Transfer crease values"},
+	{DT_TYPE_BWEIGHT_EDGE, "BEVEL_WEIGHT_EDGE", 0, "Bevel Weight", "Transfer bevel weights"},
+	{DT_TYPE_FREESTYLE_EDGE, "FREESTYLE_EDGE", 0, "Freestyle Mark", "Transfer Freestyle edge mark"},
 	{0, "", 0, "Face Corner Data", ""},
-	{DT_DATA_VCOL, "VCOL", 0, "VCol", "Vertex (face corners) colors"},
+	{DT_TYPE_VCOL, "VCOL", 0, "VCol", "Vertex (face corners) colors"},
 	{0, "", 0, "Face Data", ""},
-	{DT_DATA_UV, "UV", 0, "UVs", "Transfer UV layers"},
-	{DT_DATA_SHARP_FACE, "SMOOTH", 0, "Smooth", "Transfer flat/smooth mark"},
-	{DT_DATA_FREESTYLE_FACE, "FREESTYLE_FACE", 0, "Freestyle Mark", "Transfer Freestyle face mark"},
+	{DT_TYPE_UV, "UV", 0, "UVs", "Transfer UV layers"},
+	{DT_TYPE_SHARP_FACE, "SMOOTH", 0, "Smooth", "Transfer flat/smooth mark"},
+	{DT_TYPE_FREESTYLE_FACE, "FREESTYLE_FACE", 0, "Freestyle Mark", "Transfer Freestyle face mark"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -100,15 +100,15 @@ static EnumPropertyItem *dt_fromlayers_select_itemf(
 		return DT_fromlayers_select_items;
 	}
 
-	RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_FROMLAYERS_ACTIVE);
-	RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_FROMLAYERS_ALL);
+	RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_ACTIVE_SRC);
+	RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_ALL_SRC);
 
-	if (data_type == DT_DATA_MDEFORMVERT) {
+	if (data_type == DT_TYPE_MDEFORMVERT) {
 		Object *ob_src = CTX_data_active_object(C);
 
 		if (BKE_object_pose_armature_get(ob_src)) {
-			RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_FROMLAYERS_VGROUP_BONE_SELECTED);
-			RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_FROMLAYERS_VGROUP_BONE_DEFORM);
+			RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_VGROUP_SRC_BONE_SELECT);
+			RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_VGROUP_SRC_BONE_DEFORM);
 		}
 
 		if (ob_src) {
@@ -124,10 +124,10 @@ static EnumPropertyItem *dt_fromlayers_select_itemf(
 			}
 		}
 	}
-	else if (data_type == DT_DATA_SHAPEKEY) {
+	else if (data_type == DT_TYPE_SHAPEKEY) {
 		/* TODO */
 	}
-	else if (data_type == DT_DATA_UV) {
+	else if (data_type == DT_TYPE_UV) {
 		Object *ob_src = CTX_data_active_object(C);
 		Scene *scene = CTX_data_scene(C);
 
@@ -150,7 +150,7 @@ static EnumPropertyItem *dt_fromlayers_select_itemf(
 			}
 		}
 	}
-	else if (data_type == DT_DATA_VCOL) {
+	else if (data_type == DT_TYPE_VCOL) {
 		Object *ob_src = CTX_data_active_object(C);
 		Scene *scene = CTX_data_scene(C);
 
@@ -192,11 +192,11 @@ static EnumPropertyItem *dt_tolayers_select_itemf(bContext *C, PointerRNA *ptr, 
 		return DT_tolayers_select_items;
 	}
 
-	if (fromlayers_select == DT_FROMLAYERS_ACTIVE || fromlayers_select >= 0) {
-		RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_TOLAYERS_ACTIVE);
+	if (fromlayers_select == DT_LAYERS_ACTIVE_SRC || fromlayers_select >= 0) {
+		RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_LAYERS_ACTIVE_DST);
 	}
-	RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_TOLAYERS_NAME);
-	RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_TOLAYERS_INDEX);
+	RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_LAYERS_NAME_DST);
+	RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_LAYERS_INDEX_DST);
 
 	/* No 'specific' to-layers here, since we may transfer to several objects at once! */
 
@@ -221,7 +221,7 @@ static EnumPropertyItem *dt_mix_mode_itemf(bContext *C, PointerRNA *ptr, Propert
 
 	RNA_enum_items_add_value(&item, &totitem, DT_mix_mode_items, CDT_MIX_TRANSFER);
 
-	BKE_data_transfer_get_dttypes_capacity(dtdata_type, &support_advanced_mixing, &support_threshold);
+	BKE_object_data_transfer_get_dttypes_capacity(dtdata_type, &support_advanced_mixing, &support_threshold);
 
 	if (support_advanced_mixing) {
 		RNA_enum_items_add_value(&item, &totitem, DT_mix_mode_items, CDT_MIX_REPLACE_ABOVE_THRESHOLD);
@@ -250,8 +250,8 @@ static bool data_transfer_check(bContext *UNUSED(C), wmOperator *op)
 
 	/* TODO: check for invalid fromlayers select modes too! */
 
-	if ((fromlayers_select != DT_FROMLAYERS_ACTIVE) && (tolayers_select == DT_TOLAYERS_ACTIVE)) {
-		RNA_property_enum_set(op->ptr, prop, DT_TOLAYERS_NAME);
+	if ((fromlayers_select != DT_LAYERS_ACTIVE_SRC) && (tolayers_select == DT_LAYERS_ACTIVE_DST)) {
+		RNA_property_enum_set(op->ptr, prop, DT_LAYERS_NAME_DST);
 		return true;
 	}
 
@@ -280,9 +280,9 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 
 	const int fromlayers = RNA_enum_get(op->ptr, "fromlayers_select");
 	const int tolayers = RNA_enum_get(op->ptr, "tolayers_select");
-	int fromlayers_select[DT_MULTILAYER_IDX_MAX] = {0};
-	int tolayers_select[DT_MULTILAYER_IDX_MAX] = {0};
-	const int fromto_idx = BKE_data_transfer_dttype_to_fromto_idx(data_type);
+	int fromlayers_select[DT_MULTILAYER_INDEX_MAX] = {0};
+	int tolayers_select[DT_MULTILAYER_INDEX_MAX] = {0};
+	const int fromto_idx = BKE_object_data_transfer_dttype_to_srcdst_index(data_type);
 
 	const int mix_mode = RNA_enum_get(op->ptr, "mix_mode");
 	const float mix_factor = RNA_float_get(op->ptr, "mix_factor");
@@ -290,7 +290,7 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 	SpaceTransform space_transform_data;
 	SpaceTransform *space_transform = use_object_transform ? &space_transform_data : NULL;
 
-	if (fromto_idx != DT_MULTILAYER_IDX_INVALID) {
+	if (fromto_idx != DT_MULTILAYER_INDEX_INVALID) {
 		fromlayers_select[fromto_idx] = fromlayers;
 		tolayers_select[fromto_idx] = tolayers;
 	}
@@ -305,7 +305,7 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 			BLI_SPACE_TRANSFORM_SETUP(space_transform, ob_dst, ob_src);
 		}
 
-		if (BKE_data_transfer_mesh(scene, ob_src, ob_dst, data_type, use_create,
+		if (BKE_object_data_transfer_mesh(scene, ob_src, ob_dst, data_type, use_create,
 		                           map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode, 
 		                           space_transform, max_distance, ray_radius, fromlayers_select, tolayers_select,
 		                           mix_mode, mix_factor, NULL, false, op->reports))
@@ -430,11 +430,11 @@ void OBJECT_OT_data_transfer(wmOperatorType *ot)
 	RNA_def_property_subtype(prop, PROP_DISTANCE);
 
 	/* How to handle multi-layers types of data. */
-	prop = RNA_def_enum(ot->srna, "fromlayers_select", DT_fromlayers_select_items, DT_FROMLAYERS_ACTIVE,
+	prop = RNA_def_enum(ot->srna, "fromlayers_select", DT_fromlayers_select_items, DT_LAYERS_ACTIVE_SRC,
 	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");
 	RNA_def_property_enum_funcs_runtime(prop, NULL, NULL, dt_fromlayers_select_itemf);
 
-	prop = RNA_def_enum(ot->srna, "tolayers_select", DT_tolayers_select_items, DT_TOLAYERS_ACTIVE,
+	prop = RNA_def_enum(ot->srna, "tolayers_select", DT_tolayers_select_items, DT_LAYERS_ACTIVE_DST,
 	                    "Destination Layers Matching", "How to match source and destination layers");
 	RNA_def_property_enum_funcs_runtime(prop, NULL, NULL, dt_tolayers_select_itemf);
 

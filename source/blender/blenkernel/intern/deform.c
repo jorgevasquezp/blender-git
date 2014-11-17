@@ -1121,7 +1121,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 	const size_t elem_size = sizeof(*((MDeformVert *)NULL));
 
 	switch (tolayers) {
-		case DT_TOLAYERS_INDEX:
+		case DT_LAYERS_INDEX_DST:
 			idx_dst = BLI_listbase_count(&ob_dst->defbase);
 
 			/* Find last source actually used! */
@@ -1148,7 +1148,7 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 				                                     elem_size, 0, 0, 0, vgroups_datatransfer_interp);
 			}
 			break;
-		case DT_TOLAYERS_NAME:
+		case DT_LAYERS_NAME_DST:
 			{
 				bDeformGroup *dg_src;
 				for (idx_src = 0, dg_src = ob_src->defbase.first; idx_src < num_layers_src; idx_src++, dg_src = dg_src->next) {
@@ -1218,7 +1218,7 @@ bool data_transfer_layersmapping_vgroups(
 		return false;
 	}
 
-	if (fromlayers == DT_FROMLAYERS_ACTIVE || fromlayers >= 0) {
+	if (fromlayers == DT_LAYERS_ACTIVE_SRC || fromlayers >= 0) {
 		if (fromlayers >= 0) {
 			idx_src = fromlayers;
 			BLI_assert(idx_src < BLI_listbase_count(&ob_src->defbase));
@@ -1233,7 +1233,7 @@ bool data_transfer_layersmapping_vgroups(
 			idx_dst = tolayers;
 			BLI_assert(idx_dst < BLI_listbase_count(&ob_dst->defbase));
 		}
-		else if (tolayers == DT_TOLAYERS_ACTIVE) {
+		else if (tolayers == DT_LAYERS_ACTIVE_DST) {
 			if ((idx_dst = ob_dst->actdef - 1) == -1) {
 				bDeformGroup *dg_src;
 				if (!num_create) {
@@ -1245,7 +1245,7 @@ bool data_transfer_layersmapping_vgroups(
 				idx_dst = ob_dst->actdef - 1;
 			}
 		}
-		else if (tolayers == DT_TOLAYERS_INDEX) {
+		else if (tolayers == DT_LAYERS_INDEX_DST) {
 			int num = BLI_listbase_count(&ob_src->defbase);
 			idx_dst = idx_src;
 			if (num <= idx_dst) {
@@ -1259,7 +1259,7 @@ bool data_transfer_layersmapping_vgroups(
 				}
 			}
 		}
-		else if (tolayers == DT_TOLAYERS_NAME) {
+		else if (tolayers == DT_LAYERS_NAME_DST) {
 			bDeformGroup *dg_src = BLI_findlink(&ob_src->defbase, idx_src);
 			if ((idx_dst = defgroup_name_index(ob_dst, dg_src->name)) == -1) {
 				if (!num_create) {
@@ -1284,15 +1284,15 @@ bool data_transfer_layersmapping_vgroups(
 		bool ret = false;
 
 		switch (fromlayers) {
-			case DT_FROMLAYERS_ALL:
+			case DT_LAYERS_ALL_SRC:
 				use_layers_src = BKE_objdef_vgroup_subset_from_select_type(ob_src, WT_VGROUP_ALL,
 				                                                           &num_src, &num_sel_unused);
 				break;
-			case DT_FROMLAYERS_VGROUP_BONE_SELECTED:
+			case DT_LAYERS_VGROUP_SRC_BONE_SELECT:
 				use_layers_src = BKE_objdef_vgroup_subset_from_select_type(ob_src, WT_VGROUP_BONE_SELECT,
 				                                                           &num_src, &num_sel_unused);
 				break;
-			case DT_FROMLAYERS_VGROUP_BONE_DEFORM:
+			case DT_LAYERS_VGROUP_SRC_BONE_DEFORM:
 				use_layers_src = BKE_objdef_vgroup_subset_from_select_type(ob_src, WT_VGROUP_BONE_DEFORM,
 				                                                           &num_src, &num_sel_unused);
 				break;

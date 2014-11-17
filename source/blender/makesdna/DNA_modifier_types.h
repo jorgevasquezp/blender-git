@@ -1373,7 +1373,7 @@ typedef struct DataTransferModifierData {
 
 	struct Object *ob_source;
 
-	int data_types;  /* See DT_DATA_ enum in ED_object.h */
+	int data_types;  /* See DT_TYPE_ enum in ED_object.h */
 
 	/* See M2MMAP_MODE_ enum in BKE_mesh_mapping.h */
 	int vmap_mode;
@@ -1384,8 +1384,8 @@ typedef struct DataTransferModifierData {
 	float map_max_distance;
 	float map_ray_radius;
 
-	int fromlayers_selmode[4];  /* DT_MULTILAYER_IDX_MAX; See DT_FROMLAYERS_ enum in ED_object.h */
-	int tolayers_selmode[4];  /* DT_MULTILAYER_IDX_MAX; See DT_TOLAYERS_ enum in ED_object.h */
+	int layers_select_src[4];  /* DT_MULTILAYER_INDEX_MAX; See DT_FROMLAYERS_ enum in ED_object.h */
+	int layers_select_dst[4];  /* DT_MULTILAYER_INDEX_MAX; See DT_TOLAYERS_ enum in ED_object.h */
 
 	int mix_mode;  /* See CDT_MIX_ enum in BKE_customdata.h */
 	float mix_factor;
