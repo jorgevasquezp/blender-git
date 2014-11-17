@@ -1247,7 +1247,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             sub.prop(md, "data_types_verts_vgroup")
             row = split.row(align=True)
             row.prop(md, "fromlayers_vgroup_select", text="")
-            row.label(icon='RIGHTARROW')
+            row.label(icon='RIGHTARROW_THIN')
             row.prop(md, "tolayers_vgroup_select", text="")
             split = col.split(0.333, align=True)
             sub = split.column(align=True)
