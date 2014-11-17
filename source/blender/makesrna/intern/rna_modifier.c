@@ -135,99 +135,105 @@ EnumPropertyItem modifier_triangulate_ngon_method_items[] = {
 };
 
 /* ***** Data Transfer ***** */
-/* Mapping methods, on a per-element type basis. */
+
 EnumPropertyItem DT_method_vertex_items[] = {
-	{M2MMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology", "Copy from identical topology meshes"},
-	{M2MMAP_MODE_VERT_NEAREST, "NEAREST", 0, "Nearest vertex", "Copy from closest vertex"},
-	{M2MMAP_MODE_VERT_EDGE_NEAREST, "EDGE_NEAREST", 0, "Nearest Edge Vertex",
-			"Copy from closest vertex of closest edge"},
-	{M2MMAP_MODE_VERT_EDGEINTERP_NEAREST, "EDGEINTERP_NEAREST", 0, "Nearest Edge Interpolated",
-			"Copy from interpolated values of vertices from closest point on closest edge"},
-	{M2MMAP_MODE_VERT_POLY_NEAREST, "POLY_NEAREST", 0, "Nearest Face Vertex",
-			"Copy from closest vertex of closest face"},
-	{M2MMAP_MODE_VERT_POLYINTERP_NEAREST, "POLYINTERP_NEAREST", 0, "Nearest Face Interpolated",
-			"Copy from interpolated values of vertices from closest point on closest face"},
-	{M2MMAP_MODE_VERT_POLYINTERP_VNORPROJ, "POLYINTERP_VNORPROJ", 0, "Projected Face Interpolated",
-			"Copy from interpolated values of vertices from point on closest face hit by normal-projection"},
+	{MREMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology",
+	 "Copy from identical topology meshes"},
+	{MREMAP_MODE_VERT_NEAREST, "NEAREST", 0, "Nearest vertex",
+	 "Copy from closest vertex"},
+	{MREMAP_MODE_VERT_EDGE_NEAREST, "EDGE_NEAREST", 0, "Nearest Edge Vertex",
+	 "Copy from closest vertex of closest edge"},
+	{MREMAP_MODE_VERT_EDGEINTERP_NEAREST, "EDGEINTERP_NEAREST", 0, "Nearest Edge Interpolated",
+	 "Copy from interpolated values of vertices from closest point on closest edge"},
+	{MREMAP_MODE_VERT_POLY_NEAREST, "POLY_NEAREST", 0, "Nearest Face Vertex",
+	 "Copy from closest vertex of closest face"},
+	{MREMAP_MODE_VERT_POLYINTERP_NEAREST, "POLYINTERP_NEAREST", 0, "Nearest Face Interpolated",
+	 "Copy from interpolated values of vertices from closest point on closest face"},
+	{MREMAP_MODE_VERT_POLYINTERP_VNORPROJ, "POLYINTERP_VNORPROJ", 0, "Projected Face Interpolated",
+	 "Copy from interpolated values of vertices from point on closest face hit by normal-projection"},
 	{0, NULL, 0, NULL, NULL}
 };
 
 EnumPropertyItem DT_method_edge_items[] = {
-	{M2MMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology", "Copy from identical topology meshes"},
-	{M2MMAP_MODE_EDGE_VERT_NEAREST, "VERT_NEAREST", 0, "Nearest Vertices",
-			"Copy from most similar edge (edge which vertices are the closest of destination edge’s ones)"},
-	{M2MMAP_MODE_EDGE_NEAREST, "NEAREST", 0, "Nearest Edge", "Copy from closest edge (using midpoints)"},
-	{M2MMAP_MODE_EDGE_POLY_NEAREST, "POLY_NEAREST", 0, "Nearest Face Edge",
-			"Copy from closest edge of closest face (using midpoints)"},
-	{M2MMAP_MODE_EDGE_EDGEINTERP_VNORPROJ, "EDGEINTERP_VNORPROJ", 0, "Projected Edge Interpolated",
-			"Interpolate all source edges hit by the projection of dest one along its own normal (from vertices)"},
+	{MREMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology",
+	 "Copy from identical topology meshes"},
+	{MREMAP_MODE_EDGE_VERT_NEAREST, "VERT_NEAREST", 0, "Nearest Vertices",
+	 "Copy from most similar edge (edge which vertices are the closest of destination edge’s ones)"},
+	{MREMAP_MODE_EDGE_NEAREST, "NEAREST", 0, "Nearest Edge",
+	 "Copy from closest edge (using midpoints)"},
+	{MREMAP_MODE_EDGE_POLY_NEAREST, "POLY_NEAREST", 0, "Nearest Face Edge",
+	 "Copy from closest edge of closest face (using midpoints)"},
+	{MREMAP_MODE_EDGE_EDGEINTERP_VNORPROJ, "EDGEINTERP_VNORPROJ", 0, "Projected Edge Interpolated",
+	 "Interpolate all source edges hit by the projection of dest one along its own normal (from vertices)"},
 	{0, NULL, 0, NULL, NULL}
 };
 
 EnumPropertyItem DT_method_loop_items[] = {
-	{M2MMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology", "Copy from identical topology meshes"},
-	{M2MMAP_MODE_LOOP_NEAREST_LOOPNOR, "NEAREST_NORMAL", 0, "Nearest Corner And Best Matching Normal",
-			"Copy from nearest corner which has the best matching normal"},
-	{M2MMAP_MODE_LOOP_NEAREST_POLYNOR, "NEAREST_POLYNOR", 0, "Nearest Corner And Best Matching Face Normal",
-			"Copy from nearest corner which has the face with the best matching normal to dest corner's face one"},
-	{M2MMAP_MODE_LOOP_POLY_NEAREST, "NEAREST_POLY", 0, "Nearest Corner Of Nearest Face",
-			"Copy from nearest corner of nearest polygon"},
-	{M2MMAP_MODE_LOOP_POLYINTERP_NEAREST, "POLYINTERP_NEAREST", 0, "Nearest Face Interpolated",
-			"Copy from interpolated corners of the nearest source polygon"},
-	{M2MMAP_MODE_LOOP_POLYINTERP_LNORPROJ, "POLYINTERP_LNORPROJ", 0, "Projected Face Interpolated",
-			"Copy from interpolated corners of the source polygon hit by corner normal projection"},
+	{MREMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology",
+	 "Copy from identical topology meshes"},
+	{MREMAP_MODE_LOOP_NEAREST_LOOPNOR, "NEAREST_NORMAL", 0, "Nearest Corner And Best Matching Normal",
+	 "Copy from nearest corner which has the best matching normal"},
+	{MREMAP_MODE_LOOP_NEAREST_POLYNOR, "NEAREST_POLYNOR", 0, "Nearest Corner And Best Matching Face Normal",
+	 "Copy from nearest corner which has the face with the best matching normal to dest corner's face one"},
+	{MREMAP_MODE_LOOP_POLY_NEAREST, "NEAREST_POLY", 0, "Nearest Corner Of Nearest Face",
+	 "Copy from nearest corner of nearest polygon"},
+	{MREMAP_MODE_LOOP_POLYINTERP_NEAREST, "POLYINTERP_NEAREST", 0, "Nearest Face Interpolated",
+	 "Copy from interpolated corners of the nearest source polygon"},
+	{MREMAP_MODE_LOOP_POLYINTERP_LNORPROJ, "POLYINTERP_LNORPROJ", 0, "Projected Face Interpolated",
+	 "Copy from interpolated corners of the source polygon hit by corner normal projection"},
 	{0, NULL, 0, NULL, NULL}
 };
 
 EnumPropertyItem DT_method_poly_items[] = {
-	{M2MMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology", "Copy from identical topology meshes"},
-	{M2MMAP_MODE_POLY_NEAREST, "NEAREST", 0, "Nearest Face",
-			"Copy from nearest polygon (using center points)"},
-	{M2MMAP_MODE_POLY_NOR, "NORMAL", 0, "Best Normal-Matching",
-			"Copy from source polygon which normal is the closest to dest one"},
-	{M2MMAP_MODE_POLY_POLYINTERP_PNORPROJ, "POLYINTERP_PNORPROJ", 0, "Projected Face Interpolated",
-			"Interpolate all source polygons intersected by the projection of dest one along its own normal"},
+	{MREMAP_MODE_TOPOLOGY, "TOPOLOGY", 0, "Topology",
+	 "Copy from identical topology meshes"},
+	{MREMAP_MODE_POLY_NEAREST, "NEAREST", 0, "Nearest Face",
+	 "Copy from nearest polygon (using center points)"},
+	{MREMAP_MODE_POLY_NOR, "NORMAL", 0, "Best Normal-Matching",
+	 "Copy from source polygon which normal is the closest to dest one"},
+	{MREMAP_MODE_POLY_POLYINTERP_PNORPROJ, "POLYINTERP_PNORPROJ", 0, "Projected Face Interpolated",
+	 "Interpolate all source polygons intersected by the projection of dest one along its own normal"},
 	{0, NULL, 0, NULL, NULL}
 };
 
-/* How to filter out some elements (to leave untouched).
- * Note those options are highly dependent on type of transferred data! */
 EnumPropertyItem DT_mix_mode_items[] = {
-	{CDT_MIX_TRANSFER, "REPLACE", 0, "Replace", "Overwrite all elements' data"},
+	{CDT_MIX_TRANSFER, "REPLACE", 0, "Replace",
+	 "Overwrite all elements' data"},
 	{CDT_MIX_REPLACE_ABOVE_THRESHOLD, "ABOVE_THRESHOLD", 0, "Above Threshold",
-			"Only replace dest elements where data is above given threshold (exact behavior depends on data type)"},
+	 "Only replace dest elements where data is above given threshold (exact behavior depends on data type)"},
 	{CDT_MIX_REPLACE_BELOW_THRESHOLD, "BELOW_THRESHOLD", 0, "Below Threshold",
-			"Only replace dest elements where data is below given threshold (exact behavior depends on data type)"},
+	 "Only replace dest elements where data is below given threshold (exact behavior depends on data type)"},
 	{CDT_MIX_MIX, "MIX", 0, "Mix",
-			"Mix source value into destination one, using given threshold as factor"},
+	 "Mix source value into destination one, using given threshold as factor"},
 	{CDT_MIX_ADD, "ADD", 0, "Add",
-			"Add source value to destination one, using given threshold as factor"},
+	 "Add source value to destination one, using given threshold as factor"},
 	{CDT_MIX_SUB, "SUB", 0, "Subtract",
-			"Subtract source value to destination one, using given threshold as factor"},
+	 "Subtract source value to destination one, using given threshold as factor"},
 	{CDT_MIX_MUL, "MUL", 0, "Multiply",
-			"Multiply source value to destination one, using given threshold as factor"},
+	 "Multiply source value to destination one, using given threshold as factor"},
 	/* etc. etc. */
 	{0, NULL, 0, NULL, NULL}
 };
 
-/* How to select data layers, for types supporting multi-layers.
- * Here too, some options are highly dependent on type of transferred data! */
 EnumPropertyItem DT_fromlayers_select_items[] = {
-	{DT_LAYERS_ACTIVE_SRC, "ACTIVE", 0, "Active Layer", "Only transfer active data layer"},
-	{DT_LAYERS_ALL_SRC, "ALL", 0, "All Layers", "Transfer all data layers"},
+	{DT_LAYERS_ACTIVE_SRC, "ACTIVE", 0, "Active Layer",
+	 "Only transfer active data layer"},
+	{DT_LAYERS_ALL_SRC, "ALL", 0, "All Layers",
+	 "Transfer all data layers"},
 	{DT_LAYERS_VGROUP_SRC_BONE_SELECT, "BONE_SELECT", 0, "Selected Pose Bones",
-			"Transfer all vertex groups used by selected posebones"},
+	 "Transfer all vertex groups used by selected posebones"},
 	{DT_LAYERS_VGROUP_SRC_BONE_DEFORM, "BONE_DEFORM", 0, "Deform Pose Bones",
-			"Transfer all vertex groups used by deform bones"},
+	 "Transfer all vertex groups used by deform bones"},
 	{0, NULL, 0, NULL, NULL}
 };
 
-/* How to map a source layer to a destination layer, for types supporting multi-layers.
- * Note: if no matching layer can be found, it will be created. */
 EnumPropertyItem DT_tolayers_select_items[] = {
-	{DT_LAYERS_ACTIVE_DST, "ACTIVE", 0, "Active Layer", "Affect active data layer of all targets"},
-	{DT_LAYERS_NAME_DST, "NAME", 0, "By Name", "Match target data layers to affect by name"},
-	{DT_LAYERS_INDEX_DST, "INDEX", 0, "By Order", "Match target data layers to affect by order (indices)"},
+	{DT_LAYERS_ACTIVE_DST, "ACTIVE", 0, "Active Layer",
+	 "Affect active data layer of all targets"},
+	{DT_LAYERS_NAME_DST, "NAME", 0, "By Name",
+	 "Match target data layers to affect by name"},
+	{DT_LAYERS_INDEX_DST, "INDEX", 0, "By Order",
+	 "Match target data layers to affect by order (indices)"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -4156,22 +4162,22 @@ static void rna_def_modifier_datatransfer(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_DataTransferModifier_data_types_update");
 
 	/* Mapping methods. */
-	prop = RNA_def_enum(srna, "vert_mapping", DT_method_vertex_items, M2MMAP_MODE_VERT_NEAREST, "Vertex Mapping",
+	prop = RNA_def_enum(srna, "vert_mapping", DT_method_vertex_items, MREMAP_MODE_VERT_NEAREST, "Vertex Mapping",
 	                    "Method used to map source vertices to destination ones");
 	RNA_def_property_enum_sdna(prop, NULL, "vmap_mode");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_enum(srna, "edge_mapping", DT_method_edge_items, M2MMAP_MODE_EDGE_NEAREST, "Edge Mapping",
+	prop = RNA_def_enum(srna, "edge_mapping", DT_method_edge_items, MREMAP_MODE_EDGE_NEAREST, "Edge Mapping",
 	                    "Method used to map source edges to destination ones");
 	RNA_def_property_enum_sdna(prop, NULL, "emap_mode");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_enum(srna, "loop_mapping", DT_method_loop_items, M2MMAP_MODE_LOOP_NEAREST_POLYNOR,
+	prop = RNA_def_enum(srna, "loop_mapping", DT_method_loop_items, MREMAP_MODE_LOOP_NEAREST_POLYNOR,
 	                    "Face Corner Mapping", "Method used to map source faces' corners to destination ones");
 	RNA_def_property_enum_sdna(prop, NULL, "lmap_mode");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_enum(srna, "poly_mapping", DT_method_poly_items, M2MMAP_MODE_POLY_NEAREST, "Face Mapping",
+	prop = RNA_def_enum(srna, "poly_mapping", DT_method_poly_items, MREMAP_MODE_POLY_NEAREST, "Face Mapping",
 	                    "Method used to map source faces to destination ones");
 	RNA_def_property_enum_sdna(prop, NULL, "pmap_mode");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");

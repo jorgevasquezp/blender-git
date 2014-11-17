@@ -3688,10 +3688,10 @@ static void customdata_data_transfer_interp_generic(
 	MEM_freeN(tmp_dst);
 }
 
-void CustomData_data_transfer(const Mesh2MeshMapping *m2mmap, const DataTransferLayerMapping *laymap)
+void CustomData_data_transfer(const MeshPairRemap *m2mmap, const DataTransferLayerMapping *laymap)
 {
-	Mesh2MeshMappingItem *mapit = m2mmap->items;
-	const int totelem = m2mmap->nbr_items;
+	MeshPairRemapItem *mapit = m2mmap->items;
+	const int totelem = m2mmap->items_num;
 	int i;
 
 	const int data_type = laymap->data_type;
@@ -3730,26 +3730,26 @@ void CustomData_data_transfer(const Mesh2MeshMapping *m2mmap, const DataTransfer
 	interp = laymap->interp ? laymap->interp : customdata_data_transfer_interp_generic;
 
 	for (i = 0; i < totelem; i++, data_dst = (char *)data_dst + data_step, mapit++) {
-		const int nbr_sources = mapit->nbr_sources;
+		const int sources_num = mapit->sources_num;
 		const float mix_factor = laymap->mix_weights ? laymap->mix_weights[i] : laymap->mix_factor;
 		int j;
 
-		if (!nbr_sources) {
+		if (!sources_num) {
 			/* No sources for this element, skip it. */
 			continue;
 		}
 
-		if (UNLIKELY(nbr_sources > tmp_buff_size)) {
-			tmp_buff_size = (size_t)nbr_sources;
+		if (UNLIKELY(sources_num > tmp_buff_size)) {
+			tmp_buff_size = (size_t)sources_num;
 			tmp_data_src = MEM_reallocN(tmp_data_src, sizeof(*tmp_data_src) * tmp_buff_size);
 		}
 
-		for (j = 0; j < nbr_sources; j++) {
+		for (j = 0; j < sources_num; j++) {
 			const size_t src_idx = (size_t)mapit->indices_src[j];
 			tmp_data_src[j] = (char *)data_src + data_step * src_idx + data_offset;
 		}
 
-		interp(laymap, (char *)data_dst + data_offset, tmp_data_src, mapit->weights_src, nbr_sources, mix_factor);
+		interp(laymap, (char *)data_dst + data_offset, tmp_data_src, mapit->weights_src, sources_num, mix_factor);
 	}
 
 	MEM_freeN(tmp_data_src);

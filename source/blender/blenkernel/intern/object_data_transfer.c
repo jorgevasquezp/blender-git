@@ -794,7 +794,7 @@ bool BKE_object_data_transfer_dm(
 	int vg_idx = -1;
 	float *weights[DATAMAX] = {NULL};
 
-	Mesh2MeshMapping geom_map[DATAMAX] = {{0}};
+	MeshPairRemap geom_map[DATAMAX] = {{0}};
 	bool geom_map_init[DATAMAX] = {0};
 	ListBase lay_map = {0};
 	bool changed = false;
@@ -859,13 +859,13 @@ bool BKE_object_data_transfer_dm(
 			const int num_create = use_create ? num_verts_dst : 0;
 
 			if (!geom_map_init[VDATA]) {
-				if ((map_vert_mode == M2MMAP_MODE_TOPOLOGY) && (num_verts_dst != dm_src->getNumVerts(dm_src))) {
+				if ((map_vert_mode == MREMAP_MODE_TOPOLOGY) && (num_verts_dst != dm_src->getNumVerts(dm_src))) {
 					BKE_report(reports, RPT_ERROR,
 					           "Source and destination meshes do not have the same amount of vertices, "
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_verts_compute(
+				BKE_mesh_remap_calc_verts_from_dm(
 				        map_vert_mode, space_transform, max_distance, ray_radius,
 				        verts_dst, num_verts_dst, dirty_nors_dst, dm_src, &geom_map[VDATA]);
 				geom_map_init[VDATA] = true;
@@ -900,13 +900,13 @@ bool BKE_object_data_transfer_dm(
 			const int num_create = use_create ? num_edges_dst : 0;
 
 			if (!geom_map_init[EDATA]) {
-				if ((map_edge_mode == M2MMAP_MODE_TOPOLOGY) && (num_edges_dst != dm_src->getNumEdges(dm_src))) {
+				if ((map_edge_mode == MREMAP_MODE_TOPOLOGY) && (num_edges_dst != dm_src->getNumEdges(dm_src))) {
 					BKE_report(reports, RPT_ERROR,
 					           "Source and destination meshes do not have the same amount of edges, "
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_edges_compute(
+				BKE_mesh_remap_calc_edges_from_dm(
 				        map_edge_mode, space_transform, max_distance, ray_radius,
 				        verts_dst, num_verts_dst, edges_dst, num_edges_dst, dirty_nors_dst,
 				        dm_src, &geom_map[EDATA]);
@@ -952,13 +952,13 @@ bool BKE_object_data_transfer_dm(
 			MeshRemapIslandsCalc island_callback = data_transfer_get_loop_islands_generator(cddata_type);
 
 			if (!geom_map_init[LDATA]) {
-				if ((map_loop_mode == M2MMAP_MODE_TOPOLOGY) && (num_loops_dst != dm_src->getNumLoops(dm_src))) {
+				if ((map_loop_mode == MREMAP_MODE_TOPOLOGY) && (num_loops_dst != dm_src->getNumLoops(dm_src))) {
 					BKE_report(reports, RPT_ERROR,
 					           "Source and destination meshes do not have the same amount of face corners, "
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_loops_compute(
+				BKE_mesh_remap_calc_loops_from_dm(
 				        map_loop_mode, space_transform, max_distance, ray_radius,
 				        verts_dst, num_verts_dst, edges_dst, num_edges_dst,
 				        loops_dst, num_loops_dst, polys_dst, num_polys_dst,
@@ -1001,13 +1001,13 @@ bool BKE_object_data_transfer_dm(
 			const int num_create = use_create ? num_polys_dst : 0;
 
 			if (!geom_map_init[PDATA]) {
-				if ((map_poly_mode == M2MMAP_MODE_TOPOLOGY) && (num_polys_dst != dm_src->getNumPolys(dm_src))) {
+				if ((map_poly_mode == MREMAP_MODE_TOPOLOGY) && (num_polys_dst != dm_src->getNumPolys(dm_src))) {
 					BKE_report(reports, RPT_ERROR,
 					           "Source and destination meshes do not have the same amount of faces, "
 					           "'Topology' mapping cannot be used in this case");
 					return changed;
 				}
-				BKE_dm2mesh_mapping_polys_compute(
+				BKE_mesh_remap_calc_polys_from_dm(
 				        map_poly_mode, space_transform, max_distance, ray_radius,
 				        verts_dst, num_verts_dst, loops_dst, num_loops_dst,
 				        polys_dst, num_polys_dst, pdata_dst, dirty_nors_dst,
@@ -1041,7 +1041,7 @@ bool BKE_object_data_transfer_dm(
 	}
 
 	for (i = 0; i < DATAMAX; i++) {
-		BKE_mesh2mesh_mapping_free(&geom_map[i]);
+		BKE_mesh_remap_free(&geom_map[i]);
 		MEM_SAFE_FREE(weights[i]);
 	}
 

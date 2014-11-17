@@ -61,10 +61,10 @@ static void initData(ModifierData *md)
 	dtmd->ob_source          = NULL;
 	dtmd->data_types         = 0;
 
-	dtmd->vmap_mode          = M2MMAP_MODE_VERT_NEAREST;
-	dtmd->emap_mode          = M2MMAP_MODE_EDGE_NEAREST;
-	dtmd->lmap_mode          = M2MMAP_MODE_LOOP_NEAREST_POLYNOR;
-	dtmd->pmap_mode          = M2MMAP_MODE_POLY_NEAREST;
+	dtmd->vmap_mode          = MREMAP_MODE_VERT_NEAREST;
+	dtmd->emap_mode          = MREMAP_MODE_EDGE_NEAREST;
+	dtmd->lmap_mode          = MREMAP_MODE_LOOP_NEAREST_POLYNOR;
+	dtmd->pmap_mode          = MREMAP_MODE_POLY_NEAREST;
 
 	dtmd->map_max_distance   = 1.0f;
 	dtmd->map_ray_radius     = 0.0f;
@@ -101,16 +101,16 @@ static bool dependsOnNormals(ModifierData *md)
 	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
 	int item_types = BKE_object_data_transfer_get_dttypes_item_types(dtmd->data_types);
 
-	if ((item_types & ME_VERT) && (dtmd->vmap_mode & (M2MMAP_USE_NORPROJ | M2MMAP_USE_NORMAL))) {
+	if ((item_types & ME_VERT) && (dtmd->vmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
 		return true;
 	}
-	if ((item_types & ME_EDGE) && (dtmd->emap_mode & (M2MMAP_USE_NORPROJ | M2MMAP_USE_NORMAL))) {
+	if ((item_types & ME_EDGE) && (dtmd->emap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
 		return true;
 	}
-	if ((item_types & ME_LOOP) && (dtmd->lmap_mode & (M2MMAP_USE_NORPROJ | M2MMAP_USE_NORMAL))) {
+	if ((item_types & ME_LOOP) && (dtmd->lmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
 		return true;
 	}
-	if ((item_types & ME_POLY) && (dtmd->pmap_mode & (M2MMAP_USE_NORPROJ | M2MMAP_USE_NORMAL))) {
+	if ((item_types & ME_POLY) && (dtmd->pmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
 		return true;
 	}
 

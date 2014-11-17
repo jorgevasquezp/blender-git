@@ -100,6 +100,7 @@ enum {
 };
 
 /* Below we keep positive values for real layers idx (generated dynamically). */
+
 /* How to select data layers, for types supporting multi-layers.
  * Here too, some options are highly dependent on type of transferred data! */
 enum {

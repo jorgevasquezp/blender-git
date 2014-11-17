@@ -372,7 +372,7 @@ void CustomData_external_reload(struct CustomData *data,
 
 /* Mesh-to-mesh transfer data. */
 
-struct Mesh2MeshMapping;
+struct MeshPairRemap;
 typedef struct DataTransferLayerMapping DataTransferLayerMapping;
 
 typedef void (*cd_datatransfer_interp)(const DataTransferLayerMapping *laymap, void *dest,
@@ -405,7 +405,8 @@ enum {
 	ME_LOOP = 1 << 3,
 };
 
-/* How to filter out some elements (to leave untouched).
+/**
+ * How to filter out some elements (to leave untouched).
  * Note those options are highly dependent on type of transferred data! */
 enum {
 	CDT_MIX_NOMIX                   = -1,  /* Special case, only used because we abuse 'copy' CD callback. */
@@ -441,7 +442,7 @@ typedef struct DataTransferLayerMapping {
 } DataTransferLayerMapping;
 
 /* Those functions assume src_n and dst_n layers of given type exist in resp. src and dst. */
-void CustomData_data_transfer(const struct Mesh2MeshMapping *m2mmap, const DataTransferLayerMapping *laymap);
+void CustomData_data_transfer(const struct MeshPairRemap *m2mmap, const DataTransferLayerMapping *laymap);
 
 #ifdef __cplusplus
 }

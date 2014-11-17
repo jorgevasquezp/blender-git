@@ -1375,7 +1375,7 @@ typedef struct DataTransferModifierData {
 
 	int data_types;  /* See DT_TYPE_ enum in ED_object.h */
 
-	/* See M2MMAP_MODE_ enum in BKE_mesh_mapping.h */
+	/* See MREMAP_MODE_ enum in BKE_mesh_mapping.h */
 	int vmap_mode;
 	int emap_mode;
 	int lmap_mode;
