@@ -44,6 +44,8 @@
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_remap.h"  /* own include */
 
+#include "BLI_strict_flags.h"
+
 
 /* -------------------------------------------------------------------- */
 
@@ -216,6 +218,10 @@ typedef struct IslandResult {
 /* BVH epsilon value we have to give to bvh 'constructor' when doing approximated raycasting. */
 #define MREMAP_RAYCAST_APPROXIMATE_BVHEPSILON(_ray_radius) \
 	((float)MREMAP_RAYCAST_APPROXIMATE_NR * MREMAP_RAYCAST_APPROXIMATE_FAC * (_ray_radius))
+
+/* min 16 rays/face, max 400. */
+#define MREMAP_RAYCAST_TRI_SAMPLES_MIN 4
+#define MREMAP_RAYCAST_TRI_SAMPLES_MAX 20
 
 void BKE_mesh_remap_calc_verts_from_dm(
         const int mode, const SpaceTransform *space_transform, const float max_dist, const float ray_radius,
@@ -565,8 +571,8 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				interp_v3_v3v3(tmp_co, verts_dst[edges_dst[i].v1].co, verts_dst[edges_dst[i].v2].co, 0.5f);
 
 				hitdist = mesh_remap_bvhtree_query_nearest(
-				          &treedata, &nearest, space_transform,
-				          tmp_co, max_dist_sq);
+				        &treedata, &nearest, space_transform,
+				        tmp_co, max_dist_sq);
 
 				if (nearest.index != -1) {
 					mesh_remap_item_define(r_map, i, hitdist, 0, 1, &nearest.index, &full_weight);
@@ -595,8 +601,8 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				interp_v3_v3v3(tmp_co, verts_dst[edges_dst[i].v1].co, verts_dst[edges_dst[i].v2].co, 0.5f);
 
 				hitdist = mesh_remap_bvhtree_query_nearest(
-				          &treedata, &nearest, space_transform,
-				          tmp_co, max_dist_sq);
+				        &treedata, &nearest, space_transform,
+				        tmp_co, max_dist_sq);
 
 				if (nearest.index != -1) {
 					MPoly *mp_src = &polys_src[orig_poly_index_src[nearest.index]];
@@ -971,9 +977,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						}
 					}
 					/* verts 'ownership' is transfered to treedata here, which will handle its freeing. */
-					bvhtree_from_mesh_faces_ex(&treedata[tindex], verts_src, verts_allocated_src,
-					                           faces_src, num_faces_src, faces_allocated_src,
-					                           faces_active, num_faces_active, bvh_epsilon, 2, 6);
+					bvhtree_from_mesh_faces_ex(
+					        &treedata[tindex], verts_src, verts_allocated_src,
+					        faces_src, num_faces_src, faces_allocated_src,
+					        faces_active, num_faces_active, bvh_epsilon, 2, 6);
 					if (verts_allocated_src) {
 						verts_allocated_src = false;  /* Only 'give' our verts once, to first tree! */
 					}
@@ -1021,8 +1028,8 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						nearest.index = -1;
 
 						hitdist = mesh_remap_bvhtree_query_nearest(
-						          tdata, &nearest, space_transform,
-						          tmp_co, max_dist_sq);
+						        tdata, &nearest, space_transform,
+						        tmp_co, max_dist_sq);
 
 						if (nearest.index != -1) {
 							float (*nor_dst)[3];
@@ -1296,9 +1303,10 @@ void BKE_mesh_remap_calc_polys_from_dm(
 
 		int *orig_poly_index_src;
 
-		bvhtree_from_mesh_faces(&treedata, dm_src,
-		                        (mode & MREMAP_USE_NORPROJ) ? MREMAP_RAYCAST_APPROXIMATE_BVHEPSILON(ray_radius) : 0.0f,
-		                        2, 6);
+		bvhtree_from_mesh_faces(
+		        &treedata, dm_src,
+		        (mode & MREMAP_USE_NORPROJ) ? MREMAP_RAYCAST_APPROXIMATE_BVHEPSILON(ray_radius) : 0.0f,
+		        2, 6);
 		/* bvhtree here uses tesselated faces... */
 		orig_poly_index_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
 
@@ -1400,7 +1408,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 
 				fill_vn_fl(weights, (int)numpolys_src, 0.0f);
 
-				if ((size_t)mp->totloop > tmp_poly_size) {
+				if (UNLIKELY((size_t)mp->totloop > tmp_poly_size)) {
 					tmp_poly_size = (size_t)mp->totloop;
 					poly_vcos_2d = MEM_reallocN(poly_vcos_2d, sizeof(*poly_vcos_2d) * tmp_poly_size);
 					tri_vidx_2d = MEM_reallocN(tri_vidx_2d, sizeof(*tri_vidx_2d) * (tmp_poly_size - 2));
@@ -1431,10 +1439,11 @@ void BKE_mesh_remap_calc_polys_from_dm(
 
 				if (ray_radius) {
 					tot_rays = (int)((max_ff(poly_dst_2d_size[0], poly_dst_2d_size[1]) / ray_radius) + 0.5f);
-					CLAMP(tot_rays, 4, 20);  /* min 16 rays/face, max 400. */
+					CLAMP(tot_rays, MREMAP_RAYCAST_TRI_SAMPLES_MIN, MREMAP_RAYCAST_TRI_SAMPLES_MAX);
 				}
 				else {
-					tot_rays = 20;  /* If no radius (pure rays), give max number of rays! */
+					/* If no radius (pure rays), give max number of rays! */
+					tot_rays = MREMAP_RAYCAST_TRI_SAMPLES_MIN;
 				}
 				tot_rays *= tot_rays;
 
@@ -1509,8 +1518,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 						indices[sources_num] = j;
 						sources_num++;
 					}
-					mesh_remap_item_define(r_map, i, hitdist_accum / totweights, 0,
-					                                  sources_num, indices, weights);
+					mesh_remap_item_define(r_map, i, hitdist_accum / totweights, 0, sources_num, indices, weights);
 				}
 				else {
 					/* No source for this dest poly! */
