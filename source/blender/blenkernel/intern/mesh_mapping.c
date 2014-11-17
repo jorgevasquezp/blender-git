@@ -574,12 +574,15 @@ void BKE_mesh_loop_islands_init(
         MeshIslands *islands,
         const short item_type, const int num_items, const short island_type)
 {
-	MemArena *mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
+	MemArena *mem = islands->mem;
+
+	if (mem == NULL) {
+		mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
+	}
+	/* else memarena should be cleared */
 
 	BLI_assert(ELEM(item_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
 	BLI_assert(ELEM(island_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
-
-	BKE_mesh_loop_islands_free(islands);
 
 	islands->item_type = item_type;
 	islands->nbr_items = num_items;
@@ -592,14 +595,8 @@ void BKE_mesh_loop_islands_init(
 	islands->mem = mem;
 }
 
-void BKE_mesh_loop_islands_free(MeshIslands *islands)
+void BKE_mesh_loop_islands_clear(MeshIslands *islands)
 {
-	MemArena *mem = islands->mem;
-
-	if (mem) {
-		BLI_memarena_free(mem);
-	}
-
 	islands->item_type = 0;
 	islands->nbr_items = 0;
 	islands->items_to_islands_idx = NULL;
@@ -608,8 +605,19 @@ void BKE_mesh_loop_islands_free(MeshIslands *islands)
 	islands->nbr_islands = 0;
 	islands->islands = NULL;
 
-	islands->mem = NULL;
+	if (islands->mem) {
+		BLI_memarena_clear(islands->mem);
+		islands->mem = NULL;
+	}
+
 	islands->allocated_islands = 0;
+}
+
+void BKE_mesh_loop_islands_free(MeshIslands *islands)
+{
+	if (islands->mem) {
+		BLI_memarena_free(islands->mem);
+	}
 }
 
 void BKE_mesh_loop_islands_add(
@@ -679,7 +687,7 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 
 	int grp_idx, p_idx, pl_idx, l_idx;
 
-	BKE_mesh_loop_islands_free(r_islands);
+	BKE_mesh_loop_islands_clear(r_islands);
 	BKE_mesh_loop_islands_init(r_islands, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
 
 	poly_loop_islands_calc(

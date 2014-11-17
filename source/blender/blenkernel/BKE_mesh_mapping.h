@@ -155,6 +155,7 @@ typedef struct MeshIslands {
 void BKE_mesh_loop_islands_init(
         MeshIslands *islands,
         const short item_type, const int num_items, const short island_type);
+void BKE_mesh_loop_islands_clear(MeshIslands *islands);
 void BKE_mesh_loop_islands_free(MeshIslands *islands);
 void BKE_mesh_loop_islands_add(
         MeshIslands *islands, const int num_items, int *item_indices,
