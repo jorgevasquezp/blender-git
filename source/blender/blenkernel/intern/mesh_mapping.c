@@ -381,7 +381,13 @@ void BKE_mesh_origindex_map_create(MeshElemMap **r_map, int **r_mem,
  * Used currently for UVs and 'smooth groups'.
  * \{ */
 
-void BKE_poly_loop_islands_compute(
+/** Callback deciding whether the given poly/loop/edge define an island boundary or not.
+ */
+typedef bool (*MeshRemap_CheckIslandBoundary)(
+        const struct MPoly *mpoly, const struct MLoop *mloop, const struct MEdge *medge,
+        const int nbr_egde_users);
+
+static void poly_loop_islands_calc(
         const MEdge *medge, const int totedge, const MPoly *mpoly, const int totpoly,
         const MLoop *mloop, const int totloop, const bool use_bitflags,
         MeshRemap_CheckIslandBoundary edge_boundary_check,
@@ -556,21 +562,24 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 {
 	int *poly_groups = NULL;
 
-	BKE_poly_loop_islands_compute(medge, totedge, mpoly, totpoly, mloop, totloop, use_bitflags,
-	                              poly_is_island_boundary_smooth_cb, &poly_groups, r_totgroup);
+	poly_loop_islands_calc(
+	        medge, totedge, mpoly, totpoly, mloop, totloop, use_bitflags,
+	        poly_is_island_boundary_smooth_cb, &poly_groups, r_totgroup);
 
 	return poly_groups;
 }
 
 
-void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const int num_items, const short island_type)
+void BKE_mesh_loop_islands_init(
+        MeshIslands *islands,
+        const short item_type, const int num_items, const short island_type)
 {
 	MemArena *mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
 
 	BLI_assert(ELEM(item_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
 	BLI_assert(ELEM(island_type, MISLAND_TYPE_VERT, MISLAND_TYPE_EDGE, MISLAND_TYPE_POLY, MISLAND_TYPE_LOOP));
 
-	BKE_loop_islands_free(islands);
+	BKE_mesh_loop_islands_free(islands);
 
 	islands->item_type = item_type;
 	islands->nbr_items = num_items;
@@ -583,7 +592,7 @@ void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const in
 	islands->mem = mem;
 }
 
-void BKE_loop_islands_free(MeshIslands *islands)
+void BKE_mesh_loop_islands_free(MeshIslands *islands)
 {
 	MemArena *mem = islands->mem;
 
@@ -603,8 +612,9 @@ void BKE_loop_islands_free(MeshIslands *islands)
 	islands->allocated_islands = 0;
 }
 
-void BKE_loop_islands_add_island(MeshIslands *islands, const int num_items, int *items_indices,
-                                 const int num_island_items, int *island_item_indices)
+void BKE_mesh_loop_islands_add(
+        MeshIslands *islands, const int num_items, int *items_indices,
+        const int num_island_items, int *island_item_indices)
 {
 	MemArena *mem = islands->mem;
 
@@ -647,9 +657,12 @@ static bool mesh_check_island_boundary_uv(
 	return (me->flag & ME_SEAM) != 0;
 }
 
-/* Note: all this could be optimized... Not sure it would be worth the more complex code, though, those loops
- *       are supposed to be really quick to do... */
-bool BKE_loop_poly_island_compute_uv(
+/**
+ * \note all this could be optimized...
+ * Not sure it would be worth the more complex code, though, those loops
+ * are supposed to be really quick to do...
+ */
+bool BKE_mesh_calc_islands_loop_poly_uv(
         MVert *UNUSED(verts), const int UNUSED(totvert),
         MEdge *edges, const int totedge,
         MPoly *polys, const int totpoly,
@@ -666,10 +679,10 @@ bool BKE_loop_poly_island_compute_uv(
 
 	int grp_idx, p_idx, pl_idx, l_idx;
 
-	BKE_loop_islands_free(r_islands);
-	BKE_loop_islands_init(r_islands, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
+	BKE_mesh_loop_islands_free(r_islands);
+	BKE_mesh_loop_islands_init(r_islands, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
 
-	BKE_poly_loop_islands_compute(
+	poly_loop_islands_calc(
 	        edges, totedge, polys, totpoly, loops, totloop, false,
 	        mesh_check_island_boundary_uv, &poly_groups, &num_poly_groups);
 
@@ -696,7 +709,7 @@ bool BKE_loop_poly_island_compute_uv(
 			}
 		}
 
-		BKE_loop_islands_add_island(r_islands, num_lidx, loop_indices, num_pidx, poly_indices);
+		BKE_mesh_loop_islands_add(r_islands, num_lidx, loop_indices, num_pidx, poly_indices);
 	}
 
 	MEM_freeN(poly_indices);

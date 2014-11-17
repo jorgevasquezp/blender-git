@@ -156,7 +156,7 @@ void BKE_dm2mesh_mapping_loops_compute(
         struct MLoop *loops_dst, const int numloops_dst, struct MPoly *polys_dst, const int numpolys_dst,
         struct CustomData *ldata_dst, struct CustomData *pdata_dst, const float split_angle_dst,
         const bool dirty_nors_dst,
-        struct DerivedMesh *dm_src, loop_island_compute gen_islands_src, struct Mesh2MeshMapping *r_map);
+        struct DerivedMesh *dm_src, MeshRemapIslandsCalc gen_islands_src, struct Mesh2MeshMapping *r_map);
 
 void BKE_dm2mesh_mapping_polys_compute(
         const int mode, const struct SpaceTransform *space_transform, const float max_dist, const float ray_radius,

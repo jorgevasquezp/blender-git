@@ -152,12 +152,15 @@ typedef struct MeshIslands {
 	size_t allocated_islands;
 } MeshIslands;
 
-void BKE_loop_islands_init(MeshIslands *islands, const short item_type, const int num_items, const short island_type);
-void BKE_loop_islands_free(MeshIslands *islands);
-void BKE_loop_islands_add_island(MeshIslands *islands, const int num_items, int *item_indices,
-                                 const int num_island_items, int *island_item_indices);
+void BKE_mesh_loop_islands_init(
+        MeshIslands *islands,
+        const short item_type, const int num_items, const short island_type);
+void BKE_mesh_loop_islands_free(MeshIslands *islands);
+void BKE_mesh_loop_islands_add(
+        MeshIslands *islands, const int num_items, int *item_indices,
+        const int num_island_items, int *island_item_indices);
 
-typedef bool (*loop_island_compute)(
+typedef bool (*MeshRemapIslandsCalc)(
         struct MVert *verts, const int totvert,
         struct MEdge *edges, const int totedge,
         struct MPoly *polys, const int totpoly,
@@ -167,31 +170,18 @@ typedef bool (*loop_island_compute)(
 /* Above vert/UV mapping stuff does not do what we need here, but does things we do not need here.
  * So better keep them separated for now, I think.
  */
-bool BKE_loop_poly_island_compute_uv(
+bool BKE_mesh_calc_islands_loop_poly_uv(
         struct MVert *verts, const int totvert,
         struct MEdge *edges, const int totedge,
         struct MPoly *polys, const int totpoly,
         struct MLoop *loops, const int totloop,
         MeshIslands *r_islands);
 
-
 int *BKE_mesh_calc_smoothgroups(
         const struct MEdge *medge, const int totedge,
         const struct MPoly *mpoly, const int totpoly,
         const struct MLoop *mloop, const int totloop,
         int *r_totgroup, const bool use_bitflags);
-
-/** Callback deciding whether the given poly/loop/edge define an island boundary or not.
- */
-typedef bool (*MeshRemap_CheckIslandBoundary)(
-        const struct MPoly *mpoly, const struct MLoop *mloop, const struct MEdge *medge,
-        const int nbr_egde_users);
-
-void BKE_poly_loop_islands_compute(
-        const struct MEdge *medge, const int totedge, const struct MPoly *mpoly, const int totpoly,
-        const struct MLoop *mloop, const int totloop, const bool use_bitflags,
-        MeshRemap_CheckIslandBoundary edge_boundary_check,
-        int **r_poly_groups, int *r_totgroup);
 
 /* No good (portable) way to have exported inlined functions... */
 #define BKE_MESH_TESSFACE_VINDEX_ORDER(_mf, _v)  (                          \

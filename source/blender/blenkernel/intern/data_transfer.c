@@ -239,11 +239,11 @@ int BKE_data_transfer_dttype_to_fromto_idx(const int dtdata_type)
 
 /* ********** */
 
-static loop_island_compute data_transfer_get_loop_islands_generator(const int cddata_type)
+static MeshRemapIslandsCalc data_transfer_get_loop_islands_generator(const int cddata_type)
 {
 	switch (cddata_type) {
 		case CD_FAKE_UV:
-			return BKE_loop_poly_island_compute_uv;
+			return BKE_mesh_calc_islands_loop_poly_uv;
 			break;
 		default:
 			break;
@@ -935,7 +935,7 @@ bool BKE_data_transfer_dm(
 			CustomData *ldata_dst = dm_dst ? dm_dst->getLoopDataLayout(dm_dst) : &me_dst->ldata;
 			const int num_create = use_create ? me_dst->totloop : 0;
 
-			loop_island_compute island_callback = data_transfer_get_loop_islands_generator(cddata_type);
+			MeshRemapIslandsCalc island_callback = data_transfer_get_loop_islands_generator(cddata_type);
 
 			if (!geom_map_init[LDATA]) {
 				if ((map_loop_mode == M2MMAP_MODE_TOPOLOGY) && (num_loops_dst != dm_src->getNumLoops(dm_src))) {

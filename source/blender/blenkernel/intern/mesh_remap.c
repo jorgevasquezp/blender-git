@@ -738,7 +738,7 @@ void BKE_dm2mesh_mapping_loops_compute(
         MVert *verts_dst, const int numverts_dst, MEdge *edges_dst, const int numedges_dst,
         MLoop *loops_dst, const int numloops_dst, MPoly *polys_dst, const int numpolys_dst,
         CustomData *ldata_dst, CustomData *pdata_dst, const float split_angle_dst, const bool dirty_nors_dst,
-        DerivedMesh *dm_src, loop_island_compute gen_islands_src, Mesh2MeshMapping *r_map)
+        DerivedMesh *dm_src, MeshRemapIslandsCalc gen_islands_src, Mesh2MeshMapping *r_map)
 {
 	const float full_weight = 1.0f;
 	const float max_dist_sq = max_dist * max_dist;
@@ -1232,7 +1232,7 @@ void BKE_dm2mesh_mapping_loops_compute(
 		if (weights_interp) {
 			MEM_freeN(weights_interp);
 		}
-		BKE_loop_islands_free(&islands);
+		BKE_mesh_loop_islands_free(&islands);
 		MEM_freeN(treedata);
 	}
 }
