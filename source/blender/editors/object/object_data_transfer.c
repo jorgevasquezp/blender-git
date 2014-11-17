@@ -42,6 +42,7 @@
 #include "BKE_data_transfer.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_mesh_mapping.h"
+#include "BKE_mesh_remap.h"
 #include "BKE_object.h"
 
 #include "RNA_access.h"

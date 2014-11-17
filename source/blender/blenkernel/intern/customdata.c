@@ -58,6 +58,7 @@
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_mesh_mapping.h"
+#include "BKE_mesh_remap.h"
 #include "BKE_multires.h"
 
 #include "bmesh.h"

@@ -47,6 +47,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_dynamicpaint.h"
 #include "BKE_mesh_mapping.h"
+#include "BKE_mesh_remap.h"
 #include "BKE_multires.h"
 #include "BKE_smoke.h" /* For smokeModifier_free & smokeModifier_createType */
 
