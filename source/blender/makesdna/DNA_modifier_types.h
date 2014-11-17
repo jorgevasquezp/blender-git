@@ -1396,10 +1396,9 @@ typedef struct DataTransferModifierData {
 
 /* DataTransferModifierData.flags */
 enum {
-	MOD_DATATRANSFER_USE_CREATE       = 1 << 0,
-	MOD_DATATRANSFER_OBSRC_TRANSFORM  = 1 << 1,
-	MOD_DATATRANSFER_MAP_MAXDIST      = 1 << 2,
-	MOD_DATATRANSFER_INVERT_VGROUP    = 1 << 3,
+	MOD_DATATRANSFER_OBSRC_TRANSFORM  = 1 << 0,
+	MOD_DATATRANSFER_MAP_MAXDIST      = 1 << 1,
+	MOD_DATATRANSFER_INVERT_VGROUP    = 1 << 2,
 
 	/* Only for UI really. */
 	MOD_DATATRANSFER_USE_VERT         = 1 << 28,

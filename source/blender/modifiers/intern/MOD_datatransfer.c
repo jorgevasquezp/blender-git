@@ -78,7 +78,7 @@ static void initData(ModifierData *md)
 	dtmd->mix_factor         = 1.0f;
 	dtmd->defgrp_name[0]     = '\0';
 
-	dtmd->flags              = MOD_DATATRANSFER_USE_CREATE | MOD_DATATRANSFER_OBSRC_TRANSFORM;
+	dtmd->flags              = MOD_DATATRANSFER_OBSRC_TRANSFORM;
 }
 
 static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
@@ -158,7 +158,6 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 	DerivedMesh *dm = derivedData;
 	ReportList reports;
 
-	const bool use_create = (dtmd->flags & MOD_DATATRANSFER_USE_CREATE) != 0;
 	const bool invert_vgroup = (dtmd->flags & MOD_DATATRANSFER_INVERT_VGROUP) != 0;
 
 	const float max_dist = (dtmd->flags & MOD_DATATRANSFER_MAP_MAXDIST) ? dtmd->map_max_distance : FLT_MAX;
@@ -172,7 +171,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 
 	BKE_reports_init(&reports, RPT_STORE);
 
-	BKE_object_data_transfer_dm(md->scene, dtmd->ob_source, ob, dm, dtmd->data_types, use_create,
+	BKE_object_data_transfer_dm(md->scene, dtmd->ob_source, ob, dm, dtmd->data_types, false,
 	                     dtmd->vmap_mode, dtmd->emap_mode, dtmd->lmap_mode, dtmd->pmap_mode,
 	                     space_transform, max_dist, dtmd->map_ray_radius,
 	                     dtmd->layers_select_src, dtmd->layers_select_dst,
