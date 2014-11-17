@@ -1112,7 +1112,7 @@ static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap
 
 static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
         ListBase *r_map, const int mix_mode, const float mix_factor, const float *mix_weights,
-        const int num_elem_dst, const bool use_create,
+        const int UNUSED(num_elem_dst), const bool use_create,
         Object *ob_src, Object *ob_dst, MDeformVert *data_src, MDeformVert *data_dst, const bool UNUSED(dup_dst),
         const int tolayers, bool *use_layers_src, const int num_layers_src)
 {
