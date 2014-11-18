@@ -199,7 +199,7 @@ static bool mesh_remap_bvhtree_query_raycast(
 		*rayhit = rayhit_tmp;
 	}
 
-	if ((rayhit->index != -1) && (rayhit->dist <= max_dist)){
+	if ((rayhit->index != -1) && (rayhit->dist <= max_dist)) {
 		*r_hit_dist = rayhit->dist;
 		return true;
 	}
