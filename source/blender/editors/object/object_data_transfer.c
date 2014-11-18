@@ -324,6 +324,7 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 #endif
 }
 
+/* Used by both OBJECT_OT_data_transfer and OBJECT_OT_datalayout_transfer */
 static int data_transfer_poll(bContext *C)
 {
 	Object *ob = ED_object_context(C);
@@ -331,12 +332,31 @@ static int data_transfer_poll(bContext *C)
 	return (ob && !ob->id.lib && ob->type == OB_MESH && data && !data->lib);
 }
 
+/* Used by both OBJECT_OT_data_transfer and OBJECT_OT_datalayout_transfer */
 static bool data_transfer_draw_check_prop(PointerRNA *ptr, PropertyRNA *prop)
 {
+	PropertyRNA *prop_other;
+
 	const char *prop_id = RNA_property_identifier(prop);
 	const int data_type = RNA_enum_get(ptr, "data_type");
-	const bool use_max_distance = RNA_boolean_get(ptr, "use_max_distance");
-	const int mix_mode = RNA_enum_get(ptr, "mix_mode");
+	bool use_max_distance = false;
+	bool use_modifier = false;
+
+	if ((prop_other = RNA_struct_find_property(ptr, "use_max_distance"))) {
+		use_max_distance = RNA_property_boolean_get(ptr, prop_other);
+	}
+	if ((prop_other = RNA_struct_find_property(ptr, "modifier"))) {
+		use_modifier = RNA_property_is_set(ptr, prop_other);
+	}
+
+	if (STREQ(prop_id, "modifier")) {
+		return use_modifier;
+	}
+
+	if (use_modifier) {
+		/* Hide everything but 'modifier' property, if set. */
+		return false;
+	}
 
 	if (STREQ(prop_id, "max_distance") && !use_max_distance) {
 		return false;
@@ -355,10 +375,6 @@ static bool data_transfer_draw_check_prop(PointerRNA *ptr, PropertyRNA *prop)
 		return false;
 	}
 
-	if (STREQ(prop_id, "mix_factor") && (mix_mode == CDT_MIX_TRANSFER)) {
-		return false;
-	}
-
 	if ((STREQ(prop_id, "fromlayers_select") || STREQ(prop_id, "tolayers_select")) &&
 	    !DT_DATATYPE_IS_MULTILAYERS(data_type))
 	{
@@ -369,6 +385,7 @@ static bool data_transfer_draw_check_prop(PointerRNA *ptr, PropertyRNA *prop)
 	return true;
 }
 
+/* Used by both OBJECT_OT_data_transfer and OBJECT_OT_datalayout_transfer */
 static void data_transfer_ui(bContext *C, wmOperator *op)
 {
 	uiLayout *layout = op->layout;
@@ -479,11 +496,28 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 		Object *ob_src = ob_act;
 		Object *ob_dst;
 
+		const int data_type = RNA_enum_get(op->ptr, "data_type");
+		const bool use_delete = RNA_boolean_get(op->ptr, "use_delete");
+
+		const int fromlayers = RNA_enum_get(op->ptr, "fromlayers_select");
+		const int tolayers = RNA_enum_get(op->ptr, "tolayers_select");
+		int fromlayers_select[DT_MULTILAYER_INDEX_MAX] = {0};
+		int tolayers_select[DT_MULTILAYER_INDEX_MAX] = {0};
+		const int fromto_idx = BKE_object_data_transfer_dttype_to_srcdst_index(data_type);
+
+		if (fromto_idx != DT_MULTILAYER_INDEX_INVALID) {
+			fromlayers_select[fromto_idx] = fromlayers;
+			tolayers_select[fromto_idx] = tolayers;
+		}
+
 		CTX_DATA_BEGIN (C, Object *, ob_dst, selected_editable_objects)
 		{
 			if ((ob_dst == ob_src) || (ob_dst->type != OB_MESH)) {
 				continue;
 			}
+
+			BKE_object_data_transfer_layout(scene, ob_src, ob_dst, data_type, use_delete,
+			                                fromlayers_select, tolayers_select);
 		}
 		CTX_DATA_END;
 	}
@@ -491,23 +525,47 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int datalayout_transfer_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+static int datalayout_transfer_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-	edit_modifier_invoke_properties(C, op);
-	return datalayout_transfer_exec(C, op);
+	if (edit_modifier_invoke_properties(C, op)) {
+		return datalayout_transfer_exec(C, op);
+	}
+	else {
+		return WM_menu_invoke(C, op, event);
+	}
 }
 
 void OBJECT_OT_datalayout_transfer(wmOperatorType *ot)
 {
-	ot->name = "Datalayout Transfer";
-	ot->description = "Transfer layout of data layer(s) from active object to selected ones";
+	PropertyRNA *prop;
+
+	ot->name = "Transfer Mesh Datalayout";
+	ot->description = "Transfer layout of data layer(s) from active to selected meshes";
 	ot->idname = "OBJECT_OT_datalayout_transfer";
 
 	ot->poll = datalayout_transfer_poll;
 	ot->invoke = datalayout_transfer_invoke;
 	ot->exec = datalayout_transfer_exec;
+	ot->check = data_transfer_check;
+	ot->ui = data_transfer_ui;
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* Properties.*/
 	edit_modifier_properties(ot);
+
+	/* Data type to transfer. */
+	ot->prop = RNA_def_enum(ot->srna, "data_type", DT_layer_items, 0, "Data Type", "Which data to transfer");
+	RNA_def_boolean(ot->srna, "use_delete", false, "Exact Match",
+	                "Also delete some data layers from destination if necessary, so that it matches exactly source");
+
+	/* How to handle multi-layers types of data. */
+	prop = RNA_def_enum(ot->srna, "fromlayers_select", DT_fromlayers_select_items, DT_LAYERS_ACTIVE_SRC,
+	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");
+	RNA_def_property_enum_funcs_runtime(prop, NULL, NULL, dt_fromlayers_select_itemf);
+
+	prop = RNA_def_enum(ot->srna, "tolayers_select", DT_tolayers_select_items, DT_LAYERS_ACTIVE_DST,
+	                    "Destination Layers Matching", "How to match source and destination layers");
+	RNA_def_property_enum_funcs_runtime(prop, NULL, NULL, dt_tolayers_select_itemf);
 }
