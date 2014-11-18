@@ -1330,7 +1330,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "mix_factor")
 
         col = split.column()
-        col.label("")
+        col.operator("object.datalayout_transfer", text="Generate Data Layers")
         row = col.row(align=True)
         row.prop_search(md, "vertex_group", ob, "vertex_groups", text="")
         sub = row.row(align=True)

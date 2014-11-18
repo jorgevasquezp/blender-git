@@ -31,6 +31,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -443,4 +444,70 @@ void OBJECT_OT_data_transfer(wmOperatorType *ot)
 	RNA_def_property_enum_funcs_runtime(prop, NULL, NULL, dt_mix_mode_itemf);
 	RNA_def_float(ot->srna, "mix_factor", 1.0f, 0.0f, 1.0f, "Mix Factor",
 	              "Factor to use when applying data to destination (exact behavior depends on mix mode)", 0.0f, 1.0f);
+}
+
+/******************************************************************************/
+/* Note: This operator is hybrid, it can work as a usual standalone Object operator,
+ *       or as a DataTransfer modifier tool.
+ */
+
+static int datalayout_transfer_poll(bContext *C)
+{
+	return (edit_modifier_poll_generic(C, &RNA_DataTransferModifier, (1 << OB_MESH)) || data_transfer_poll(C));
+}
+
+static int datalayout_transfer_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene = CTX_data_scene(C);
+	Object *ob_act = ED_object_active_context(C);
+	DataTransferModifierData *dtmd;
+
+	dtmd = (DataTransferModifierData *)edit_modifier_property_get(op, ob_act, eModifierType_DataTransfer);
+
+	/* If we have a modifier, we transfer data layout from this modifier's source object to active one.
+	 * Else, we transfer data layout from active object to all selected ones. */
+	if (dtmd) {
+		Object *ob_src = dtmd->ob_source;
+		Object *ob_dst = ob_act;
+
+		const bool use_delete = false;  /* Never when used from modifier, for now. */
+
+		BKE_object_data_transfer_layout(scene, ob_src, ob_dst, dtmd->data_types, use_delete,
+		                                dtmd->layers_select_src, dtmd->layers_select_dst);
+	}
+	else {
+		Object *ob_src = ob_act;
+		Object *ob_dst;
+
+		CTX_DATA_BEGIN (C, Object *, ob_dst, selected_editable_objects)
+		{
+			if ((ob_dst == ob_src) || (ob_dst->type != OB_MESH)) {
+				continue;
+			}
+		}
+		CTX_DATA_END;
+	}
+
+	return OPERATOR_FINISHED;
+}
+
+static int datalayout_transfer_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	edit_modifier_invoke_properties(C, op);
+	return datalayout_transfer_exec(C, op);
+}
+
+void OBJECT_OT_datalayout_transfer(wmOperatorType *ot)
+{
+	ot->name = "Datalayout Transfer";
+	ot->description = "Transfer layout of data layer(s) from active object to selected ones";
+	ot->idname = "OBJECT_OT_datalayout_transfer";
+
+	ot->poll = datalayout_transfer_poll;
+	ot->invoke = datalayout_transfer_invoke;
+	ot->exec = datalayout_transfer_exec;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+	edit_modifier_properties(ot);
 }
