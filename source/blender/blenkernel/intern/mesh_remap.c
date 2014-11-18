@@ -179,6 +179,8 @@ static bool mesh_remap_bvhtree_query_raycast(
         float co[3], float no[3], const float radius, const float max_dist,
         float *r_hit_dist)
 {
+	BVHTreeRayHit rayhit_tmp;
+
 	/* Convert the vertex to tree coordinates, if needed. */
 	if (space_transform) {
 		BLI_space_transform_apply(space_transform, co);
@@ -189,15 +191,15 @@ static bool mesh_remap_bvhtree_query_raycast(
 	rayhit->dist = max_dist;
 	BLI_bvhtree_ray_cast(treedata->tree, co, no, radius, rayhit, treedata->raycast_callback, treedata);
 
-#if 0  /* Stupid in fact!? */
-	/* If no ray hit along vertex normal, try in the other direction! */
-	if (rayhit->index < 0 || (rayhit->dist * rayhit->dist) > max_dist_sq) {
-		negate_v3(no);
-		BLI_bvhtree_ray_cast(treedata->tree, co, no, radius, rayhit, treedata->raycast_callback, treedata);
+	/* Also cast in the other direction! */
+	rayhit_tmp = *rayhit;
+	negate_v3(no);
+	BLI_bvhtree_ray_cast(treedata->tree, co, no, radius, &rayhit_tmp, treedata->raycast_callback, treedata);
+	if (rayhit_tmp.dist < rayhit->dist) {
+		*rayhit = rayhit_tmp;
 	}
-#endif
 
-	if ((rayhit->index != -1) && (rayhit->dist <= max_dist)) {
+	if ((rayhit->index != -1) && (rayhit->dist <= max_dist)){
 		*r_hit_dist = rayhit->dist;
 		return true;
 	}
