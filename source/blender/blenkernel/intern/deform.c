@@ -1340,16 +1340,16 @@ bool data_transfer_layersmapping_vgroups(
 
 		switch (fromlayers) {
 			case DT_LAYERS_ALL_SRC:
-				use_layers_src = BKE_objdef_vgroup_subset_from_select_type(ob_src, WT_VGROUP_ALL,
-				                                                           &num_src, &num_sel_unused);
+				use_layers_src = BKE_object_defgroup_subset_from_select_type(ob_src, WT_VGROUP_ALL,
+				                                                             &num_src, &num_sel_unused);
 				break;
 			case DT_LAYERS_VGROUP_SRC_BONE_SELECT:
-				use_layers_src = BKE_objdef_vgroup_subset_from_select_type(ob_src, WT_VGROUP_BONE_SELECT,
-				                                                           &num_src, &num_sel_unused);
+				use_layers_src = BKE_object_defgroup_subset_from_select_type(ob_src, WT_VGROUP_BONE_SELECT,
+				                                                             &num_src, &num_sel_unused);
 				break;
 			case DT_LAYERS_VGROUP_SRC_BONE_DEFORM:
-				use_layers_src = BKE_objdef_vgroup_subset_from_select_type(ob_src, WT_VGROUP_BONE_DEFORM,
-				                                                           &num_src, &num_sel_unused);
+				use_layers_src = BKE_object_defgroup_subset_from_select_type(ob_src, WT_VGROUP_BONE_DEFORM,
+				                                                             &num_src, &num_sel_unused);
 				break;
 		}
 
