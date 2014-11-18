@@ -215,7 +215,7 @@ EnumPropertyItem DT_mix_mode_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem DT_fromlayers_select_items[] = {
+EnumPropertyItem DT_layers_select_src_items[] = {
 	{DT_LAYERS_ACTIVE_SRC, "ACTIVE", 0, "Active Layer",
 	 "Only transfer active data layer"},
 	{DT_LAYERS_ALL_SRC, "ALL", 0, "All Layers",
@@ -227,7 +227,7 @@ EnumPropertyItem DT_fromlayers_select_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem DT_tolayers_select_items[] = {
+EnumPropertyItem DT_layers_select_dst_items[] = {
 	{DT_LAYERS_ACTIVE_DST, "ACTIVE", 0, "Active Layer",
 	 "Affect active data layer of all targets"},
 	{DT_LAYERS_NAME_DST, "NAME", 0, "By Name",
@@ -760,26 +760,26 @@ static void rna_DataTransferModifier_data_types_update(Main *bmain, Scene *scene
 	rna_Modifier_update(bmain, scene, ptr);
 }
 
-static EnumPropertyItem *rna_DataTransferModifier_fromlayers_select_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *prop, bool *r_free)
+static EnumPropertyItem *rna_DataTransferModifier_layers_select_src_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *prop, bool *r_free)
 {
 	DataTransferModifierData *dtmd = (DataTransferModifierData *)ptr->data;
 	EnumPropertyItem *item = NULL, tmp_item = {0};
 	int totitem = 0;
 
 	if (!C) {  /* needed for docs and i18n tools */
-		return DT_fromlayers_select_items;
+		return DT_layers_select_src_items;
 	}
 
 	/* No active here! */
-	RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_ALL_SRC);
+	RNA_enum_items_add_value(&item, &totitem, DT_layers_select_src_items, DT_LAYERS_ALL_SRC);
 
-	if (STREQ(RNA_property_identifier(prop), "fromlayers_vgroup_select")) {
+	if (STREQ(RNA_property_identifier(prop), "layers_vgroup_select_src")) {
 		Object *ob_src = dtmd->ob_source;
 
 #if 0  /* XXX Don't think we want this in modifier version... */
 		if (BKE_object_pose_armature_get(ob_src)) {
-			RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_VGROUP_SRC_BONE_SELECT);
-			RNA_enum_items_add_value(&item, &totitem, DT_fromlayers_select_items, DT_LAYERS_VGROUP_SRC_BONE_DEFORM);
+			RNA_enum_items_add_value(&item, &totitem, DT_layers_select_src_items, DT_LAYERS_VGROUP_SRC_BONE_SELECT);
+			RNA_enum_items_add_value(&item, &totitem, DT_layers_select_src_items, DT_LAYERS_VGROUP_SRC_BONE_DEFORM);
 		}
 #endif
 
@@ -796,10 +796,10 @@ static EnumPropertyItem *rna_DataTransferModifier_fromlayers_select_itemf(bConte
 			}
 		}
 	}
-	else if (STREQ(RNA_property_identifier(prop), "fromlayers_shapekey_select")) {
+	else if (STREQ(RNA_property_identifier(prop), "layers_shapekey_select_src")) {
 		/* TODO */
 	}
-	else if (STREQ(RNA_property_identifier(prop), "fromlayers_uv_select")) {
+	else if (STREQ(RNA_property_identifier(prop), "layers_uv_select_src")) {
 		Object *ob_src = dtmd->ob_source;
 
 		if (ob_src) {
@@ -821,7 +821,7 @@ static EnumPropertyItem *rna_DataTransferModifier_fromlayers_select_itemf(bConte
 			}
 		}
 	}
-	else if (STREQ(RNA_property_identifier(prop), "fromlayers_vcol_select")) {
+	else if (STREQ(RNA_property_identifier(prop), "layers_vcol_select_src")) {
 		Object *ob_src = dtmd->ob_source;
 
 		if (ob_src) {
@@ -850,21 +850,21 @@ static EnumPropertyItem *rna_DataTransferModifier_fromlayers_select_itemf(bConte
 	return item;
 }
 
-static EnumPropertyItem *rna_DataTransferModifier_tolayers_select_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *prop, bool *r_free)
+static EnumPropertyItem *rna_DataTransferModifier_layers_select_dst_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *prop, bool *r_free)
 {
 	DataTransferModifierData *dtmd = (DataTransferModifierData *)ptr->data;
 	EnumPropertyItem *item = NULL, tmp_item = {0};
 	int totitem = 0;
 
 	if (!C) {  /* needed for docs and i18n tools */
-		return DT_tolayers_select_items;
+		return DT_layers_select_dst_items;
 	}
 
 	/* No active here! */
-	RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_LAYERS_NAME_DST);
-	RNA_enum_items_add_value(&item, &totitem, DT_tolayers_select_items, DT_LAYERS_INDEX_DST);
+	RNA_enum_items_add_value(&item, &totitem, DT_layers_select_dst_items, DT_LAYERS_NAME_DST);
+	RNA_enum_items_add_value(&item, &totitem, DT_layers_select_dst_items, DT_LAYERS_INDEX_DST);
 
-	if (STREQ(RNA_property_identifier(prop), "tolayers_vgroup_select")) {
+	if (STREQ(RNA_property_identifier(prop), "layers_vgroup_select_dst")) {
 		/* Only list destination layers if we have a single source! */
 		if (dtmd->layers_select_src[DT_MULTILAYER_INDEX_MDEFORMVERT] >= 0) {
 			Object *ob_dst = CTX_data_active_object(C); /* XXX Is this OK? */
@@ -883,10 +883,10 @@ static EnumPropertyItem *rna_DataTransferModifier_tolayers_select_itemf(bContext
 			}
 		}
 	}
-	else if (STREQ(RNA_property_identifier(prop), "tolayers_shapekey_select")) {
+	else if (STREQ(RNA_property_identifier(prop), "layers_shapekey_select_dst")) {
 		/* TODO */
 	}
-	else if (STREQ(RNA_property_identifier(prop), "tolayers_uv_select")) {
+	else if (STREQ(RNA_property_identifier(prop), "layers_uv_select_dst")) {
 		/* Only list destination layers if we have a single source! */
 		if (dtmd->layers_select_src[DT_MULTILAYER_INDEX_UV] >= 0) {
 			Object *ob_dst = CTX_data_active_object(C); /* XXX Is this OK? */
@@ -910,7 +910,7 @@ static EnumPropertyItem *rna_DataTransferModifier_tolayers_select_itemf(bContext
 			}
 		}
 	}
-	else if (STREQ(RNA_property_identifier(prop), "tolayers_vcol_select")) {
+	else if (STREQ(RNA_property_identifier(prop), "layers_vcol_select_dst")) {
 		/* Only list destination layers if we have a single source! */
 		if (dtmd->layers_select_src[DT_MULTILAYER_INDEX_VCOL] >= 0) {
 			Object *ob_dst = CTX_data_active_object(C); /* XXX Is this OK? */
@@ -4203,56 +4203,56 @@ static void rna_def_modifier_datatransfer(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	/* How to handle multi-layers types of data. */
-	prop = RNA_def_enum(srna, "fromlayers_vgroup_select", DT_fromlayers_select_items, DT_LAYERS_ALL_SRC,
+	prop = RNA_def_enum(srna, "layers_vgroup_select_src", DT_layers_select_src_items, DT_LAYERS_ALL_SRC,
 	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_src[DT_MULTILAYER_INDEX_MDEFORMVERT]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_fromlayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_src_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 #if 0
-	prop = RNA_def_enum(srna, "fromlayers_shapekey_select", DT_fromlayers_select_items, DT_LAYERS_ALL_SRC,
+	prop = RNA_def_enum(srna, "layers_shapekey_select_src", DT_layers_select_src_items, DT_LAYERS_ALL_SRC,
 	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_src[DT_MULTILAYER_INDEX_SHAPEKEY]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_fromlayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_src_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 #endif
 
-	prop = RNA_def_enum(srna, "fromlayers_vcol_select", DT_fromlayers_select_items, DT_LAYERS_ALL_SRC,
+	prop = RNA_def_enum(srna, "layers_vcol_select_src", DT_layers_select_src_items, DT_LAYERS_ALL_SRC,
 	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_src[DT_MULTILAYER_INDEX_VCOL]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_fromlayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_src_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_enum(srna, "fromlayers_uv_select", DT_fromlayers_select_items, DT_LAYERS_ALL_SRC,
+	prop = RNA_def_enum(srna, "layers_uv_select_src", DT_layers_select_src_items, DT_LAYERS_ALL_SRC,
 	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_src[DT_MULTILAYER_INDEX_UV]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_fromlayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_src_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_enum(srna, "tolayers_vgroup_select", DT_tolayers_select_items, DT_LAYERS_NAME_DST,
+	prop = RNA_def_enum(srna, "layers_vgroup_select_dst", DT_layers_select_dst_items, DT_LAYERS_NAME_DST,
 	                    "Destination Layers Matching", "How to match source and destination layers");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_dst[DT_MULTILAYER_INDEX_MDEFORMVERT]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_tolayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_dst_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 #if 0
-	prop = RNA_def_enum(srna, "tolayers_shapekey_select", DT_tolayers_select_items, DT_LAYERS_NAME_DST,
+	prop = RNA_def_enum(srna, "layers_shapekey_select_dst", DT_layers_select_dst_items, DT_LAYERS_NAME_DST,
 	                    "Destination Layers Matching", "How to match source and destination layers");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_dst[DT_MULTILAYER_INDEX_SHAPEKEY]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_tolayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_dst_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 #endif
 
-	prop = RNA_def_enum(srna, "tolayers_vcol_select", DT_tolayers_select_items, DT_LAYERS_NAME_DST,
+	prop = RNA_def_enum(srna, "layers_vcol_select_dst", DT_layers_select_dst_items, DT_LAYERS_NAME_DST,
 	                    "Destination Layers Matching", "How to match source and destination layers");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_dst[DT_MULTILAYER_INDEX_VCOL]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_tolayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_dst_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_enum(srna, "tolayers_uv_select", DT_tolayers_select_items, DT_LAYERS_NAME_DST,
+	prop = RNA_def_enum(srna, "layers_uv_select_dst", DT_layers_select_dst_items, DT_LAYERS_NAME_DST,
 	                    "Destination Layers Matching", "How to match source and destination layers");
 	RNA_def_property_enum_sdna(prop, NULL, "layers_select_dst[DT_MULTILAYER_INDEX_UV]");
-	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_tolayers_select_itemf");
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_DataTransferModifier_layers_select_dst_itemf");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	/* Mix stuff */
