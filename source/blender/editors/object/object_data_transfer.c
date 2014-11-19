@@ -31,6 +31,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -45,6 +46,7 @@
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_remap.h"
 #include "BKE_object.h"
+#include "BKE_report.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -259,10 +261,62 @@ static bool data_transfer_check(bContext *UNUSED(C), wmOperator *op)
 	return false;
 }
 
+/* Helper, used by both data_transfer_exec and datalayout_transfer_exec. */
+static void data_transfer_exec_preprocess_objects(bContext *C, wmOperator *op, Object *ob_src, ListBase *ctx_objects)
+{
+	CollectionPointerLink *ctx_ob;
+	CTX_data_selected_editable_objects(C, ctx_objects);
+
+	for (ctx_ob = ctx_objects->first; ctx_ob; ctx_ob = ctx_ob->next) {
+		Object *ob = ctx_ob->ptr.data;
+		Mesh *me;
+		if ((ob == ob_src) || (ob->type != OB_MESH)) {
+			continue;
+		}
+
+		me = ob->data;
+		if (me->id.lib) {
+			/* Do not transfer to linked data, not supported. */
+			BKE_reportf(op->reports, RPT_WARNING, "Skipping object '%s', linked data '%s' cannot be modified",
+			            ob->id.name + 2, me->id.name + 2);
+			me->id.flag &= ~LIB_DOIT;
+			continue;
+		}
+
+		me->id.flag |= LIB_DOIT;
+	}
+}
+
+/* Helper, used by both data_transfer_exec and datalayout_transfer_exec. */
+static bool data_transfer_exec_is_object_valid(wmOperator *op, Object *ob_src, Object *ob_dst)
+{
+	Mesh *me;
+	if ((ob_dst == ob_src) || (ob_dst->type != OB_MESH)) {
+		return false;
+	}
+
+	me = ob_dst->data;
+	if (me->id.flag & LIB_DOIT) {
+		me->id.flag &= ~LIB_DOIT;
+		return true;
+	}
+	else if (me->id.lib == NULL) {
+		/* Do not transfer apply operation more than once. */
+		/* XXX This is not nice regarding vgroups, which are half-Object data... :/ */
+		BKE_reportf(op->reports, RPT_WARNING,
+		            "Skipping object '%s', data '%s' has already been processed with a previous object",
+		            ob_dst->id.name + 2, me->id.name + 2);
+	}
+	return false;
+}
+
 static int data_transfer_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
 	Object *ob_src = CTX_data_active_object(C);
+
+	ListBase ctx_objects;
+	CollectionPointerLink *ctx_ob_dst;
 
 	bool changed = false;
 
@@ -296,25 +350,27 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 		layers_select_dst[fromto_idx] = layers_dst;
 	}
 
-	CTX_DATA_BEGIN (C, Object *, ob_dst, selected_editable_objects)
-	{
-		if ((ob_dst == ob_src) || (ob_dst->type != OB_MESH)) {
-			continue;
-		}
+	data_transfer_exec_preprocess_objects(C, op, ob_src, &ctx_objects);
 
-		if (space_transform) {
-			BLI_SPACE_TRANSFORM_SETUP(space_transform, ob_dst, ob_src);
-		}
+	for (ctx_ob_dst = ctx_objects.first; ctx_ob_dst; ctx_ob_dst = ctx_ob_dst->next) {
+		Object *ob_dst = ctx_ob_dst->ptr.data;
+		if (data_transfer_exec_is_object_valid(op, ob_src, ob_dst)) {
+			if (space_transform) {
+				BLI_SPACE_TRANSFORM_SETUP(space_transform, ob_dst, ob_src);
+			}
 
-		if (BKE_object_data_transfer_mesh(scene, ob_src, ob_dst, data_type, use_create,
-		                           map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode, 
-		                           space_transform, max_distance, ray_radius, layers_select_src, layers_select_dst,
-		                           mix_mode, mix_factor, NULL, false, op->reports))
-		{
-			changed = true;
+			if (BKE_object_data_transfer_mesh(
+			        scene, ob_src, ob_dst, data_type, use_create,
+			        map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode,
+			        space_transform, max_distance, ray_radius, layers_select_src, layers_select_dst,
+			        mix_mode, mix_factor, NULL, false, op->reports))
+			{
+				changed = true;
+			}
 		}
 	}
-	CTX_DATA_END;
+
+	BLI_freelistN(&ctx_objects);
 
 #if 0  /* TODO */
 	/* Note: issue with that is that if canceled, operator cannot be redone... Nasty in our case. */
@@ -494,7 +550,9 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 	}
 	else {
 		Object *ob_src = ob_act;
-		Object *ob_dst;
+
+		ListBase ctx_objects;
+		CollectionPointerLink *ctx_ob_dst;
 
 		const int data_type = RNA_enum_get(op->ptr, "data_type");
 		const bool use_delete = RNA_boolean_get(op->ptr, "use_delete");
@@ -510,16 +568,17 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 			layers_select_dst[fromto_idx] = layers_dst;
 		}
 
-		CTX_DATA_BEGIN (C, Object *, ob_dst, selected_editable_objects)
-		{
-			if ((ob_dst == ob_src) || (ob_dst->type != OB_MESH)) {
-				continue;
-			}
+		data_transfer_exec_preprocess_objects(C, op, ob_src, &ctx_objects);
 
-			BKE_object_data_transfer_layout(scene, ob_src, ob_dst, data_type, use_delete,
-			                                layers_select_src, layers_select_dst);
+		for (ctx_ob_dst = ctx_objects.first; ctx_ob_dst; ctx_ob_dst = ctx_ob_dst->next) {
+			Object *ob_dst = ctx_ob_dst->ptr.data;
+			if (data_transfer_exec_is_object_valid(op, ob_src, ob_dst)) {
+				BKE_object_data_transfer_layout(scene, ob_src, ob_dst, data_type, use_delete,
+				                                layers_select_src, layers_select_dst);
+			}
 		}
-		CTX_DATA_END;
+
+		BLI_freelistN(&ctx_objects);
 	}
 
 	return OPERATOR_FINISHED;
