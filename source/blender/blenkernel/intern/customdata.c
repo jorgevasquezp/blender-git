@@ -3603,6 +3603,11 @@ static void customdata_data_transfer_interp_generic(
 
 	void *tmp_dst;
 
+	if (!sources) {
+		/* Not supported here, abort. */
+		return;
+	}
+
 	if (data_type & CD_FAKE) {
 		data_size = laymap->data_size;
 	}
@@ -3705,13 +3710,16 @@ void CustomData_data_transfer(const MeshPairRemap *me_remap, const CustomDataTra
 	cd_datatransfer_interp interp = NULL;
 
 	size_t tmp_buff_size = 32;
-	void **tmp_data_src;
+	void **tmp_data_src = NULL;
 
-	if (!data_src || !data_dst) {
+	/* Note: NULL data_src may happen and be valid (see vgroups...). */
+	if (!data_dst) {
 		return;
 	}
 
-	tmp_data_src = MEM_mallocN(sizeof(*tmp_data_src) * tmp_buff_size, __func__);
+	if (data_src) {
+		tmp_data_src = MEM_mallocN(sizeof(*tmp_data_src) * tmp_buff_size, __func__);
+	}
 
 	if (data_type & CD_FAKE) {
 		data_step = laymap->elem_size;
@@ -3739,18 +3747,20 @@ void CustomData_data_transfer(const MeshPairRemap *me_remap, const CustomDataTra
 			continue;
 		}
 
-		if (UNLIKELY(sources_num > tmp_buff_size)) {
-			tmp_buff_size = (size_t)sources_num;
-			tmp_data_src = MEM_reallocN(tmp_data_src, sizeof(*tmp_data_src) * tmp_buff_size);
-		}
+		if (tmp_data_src) {
+			if (UNLIKELY(sources_num > tmp_buff_size)) {
+				tmp_buff_size = (size_t)sources_num;
+				tmp_data_src = MEM_reallocN(tmp_data_src, sizeof(*tmp_data_src) * tmp_buff_size);
+			}
 
-		for (j = 0; j < sources_num; j++) {
-			const size_t src_idx = (size_t)mapit->indices_src[j];
-			tmp_data_src[j] = (char *)data_src + data_step * src_idx + data_offset;
+			for (j = 0; j < sources_num; j++) {
+				const size_t src_idx = (size_t)mapit->indices_src[j];
+				tmp_data_src[j] = (char *)data_src + data_step * src_idx + data_offset;
+			}
 		}
 
 		interp(laymap, (char *)data_dst + data_offset, tmp_data_src, mapit->weights_src, sources_num, mix_factor);
 	}
 
-	MEM_freeN(tmp_data_src);
+	MEM_SAFE_FREE(tmp_data_src);
 }

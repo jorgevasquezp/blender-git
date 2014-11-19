@@ -1082,11 +1082,13 @@ static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap
 	MDeformWeight *dw_dst = defvert_find_index(data_dst, idx_dst);
 	float weight_src = 0.0f, weight_dst = 0.0f;
 
-	for (i = count; i--;) {
-		for (j = data_src[i]->totweight; j--;) {
-			if ((dw_src = &data_src[i]->dw[j])->def_nr == idx_src) {
-				weight_src += dw_src->weight * weights[i];
-				break;
+	if (sources) {
+		for (i = count; i--;) {
+			for (j = data_src[i]->totweight; j--;) {
+				if ((dw_src = &data_src[i]->dw[j])->def_nr == idx_src) {
+					weight_src += dw_src->weight * weights[i];
+					break;
+				}
 			}
 		}
 	}
@@ -1138,13 +1140,12 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 				}
 				/* Create as much vgroups as necessary! */
 				for (; idx_dst < idx_src; idx_dst++) {
-					BKE_defgroup_new(ob_dst, DATA_("Group"));
-					ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
+					BKE_object_defgroup_add(ob_dst);
 				}
 			}
 			else if (use_delete && idx_dst > idx_src) {
 				while (idx_dst-- > idx_src) {
-					/* TODO - needs refactor of vgroup code first (move some func from ED to BKE) */
+					BKE_object_defgroup_remove(ob_dst, ob_dst->defbase.last);
 				}
 			}
 			if (r_map) {
@@ -1166,13 +1167,17 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 			break;
 		case DT_LAYERS_NAME_DST:
 			{
-				bDeformGroup *dg_src;
-				bool *data_dst_to_delete = NULL;
+				bDeformGroup *dg_src, *dg_dst;
 
 				if (use_delete) {
-					if (tot_dst) {
-						data_dst_to_delete = MEM_mallocN(sizeof(*data_dst_to_delete) * (size_t)tot_dst, __func__);
-						memset(data_dst_to_delete, true, sizeof(*data_dst_to_delete) * (size_t)tot_dst);
+					/* Remove all unused dst vgroups first, simpler in this case. */
+					for (dg_dst = ob_dst->defbase.first; dg_dst;) {
+						bDeformGroup *dg_dst_next = dg_dst->next;
+
+						if (defgroup_name_index(ob_src, dg_dst->name) == -1) {
+							BKE_object_defgroup_remove(ob_dst, dg_dst);
+						}
+						dg_dst = dg_dst_next;
 					}
 				}
 
@@ -1186,19 +1191,17 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 
 					if ((idx_dst = defgroup_name_index(ob_dst, dg_src->name)) == -1) {
 						if (!use_create) {
-							BLI_freelistN(r_map);
+							if (r_map) {
+								BLI_freelistN(r_map);
+							}
 							return false;
 						}
-						BKE_defgroup_new(ob_dst, dg_src->name);
-						ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
+						BKE_object_defgroup_add_name(ob_dst, dg_src->name);
 						idx_dst = ob_dst->actdef - 1;
-					}
-					else if (data_dst_to_delete) {
-						data_dst_to_delete[idx_dst] = false;
 					}
 					if (r_map) {
 						/* At this stage, we **need** a valid CD_MDEFORMVERT layer on dest!
-						 * Again, use_create is not relevant in this case */
+						 * use_create is not relevant in this case */
 						if (!data_dst) {
 							data_dst = CustomData_add_layer(cd_dst, CD_MDEFORMVERT, CD_CALLOC, NULL, num_elem_dst);
 						}
@@ -1208,19 +1211,6 @@ static bool data_transfer_layersmapping_vgroups_multisrc_to_dst(
 						        data_src, data_dst, idx_src, idx_dst,
 						        elem_size, 0, 0, 0, vgroups_datatransfer_interp);
 					}
-				}
-				if (data_dst_to_delete) {
-					/* Note: This won't affect newly created vgroups, if any, since tot_dst has not been updated!
-					 *       Also, looping backward ensures us we do not suffer from index shifting
-					 *       when deleting a vgroup.
-					 */
-					for (idx_dst = tot_dst; idx_dst--;) {
-						if (data_dst_to_delete[idx_dst]) {
-							/* TODO - needs refactor of vgroup code first (move some func from ED to BKE) */
-						}
-					}
-
-					MEM_freeN(data_dst_to_delete);
 				}
 				break;
 			}
@@ -1241,26 +1231,25 @@ bool data_transfer_layersmapping_vgroups(
 
 	const size_t elem_size = sizeof(*((MDeformVert *)NULL));
 
-	/* Note: in theory, we could still create vgroup layout on dest (if asked for it), but... :/ */
-	if (!(data_src = CustomData_get_layer(cd_src, CD_MDEFORMVERT))) {
+	/* Note: VGroups are a bit hairy, since their layout is defined on object level (ob->defbase), while their actual
+	 *       data is a (mesh) CD layer.
+	 *       This implies we may have to handle data layout itself while having NULL data itself,
+	 *       and even have to support NULL data_src in transfer data code (we always create a data_dst, though).
+	 */
+
+	if (BLI_listbase_is_empty(&ob_src->defbase)) {
 		if (use_delete) {
-			/* TODO - needs refactor of vgroup code first (move some func from ED to BKE) */
+			BKE_object_defgroup_remove_all(ob_dst);
 		}
 		return true;
 	}
 
-	/* Note: VGroups are a bit hairy, we may have (empty) vgroups with no data_dst, so we do not 'fail' on missing
-	 *       cdlayer, nor create it right now.
-	 *       In other words, we have to take care of possible NULL data_dst, and create it later if needed.
-	 */
-	if (CustomData_has_layer(cd_dst, CD_MDEFORMVERT)) {
+	data_src = CustomData_get_layer(cd_src, CD_MDEFORMVERT);
+
+	data_dst = CustomData_get_layer(cd_dst, CD_MDEFORMVERT);
+	if (data_dst && use_dupref_dst && r_map) {
 		/* If dest is a derivedmesh, we do not want to overwrite cdlayers of org mesh! */
-		if (use_dupref_dst && r_map) {
-			data_dst = CustomData_duplicate_referenced_layer(cd_dst, CD_MDEFORMVERT, num_elem_dst);
-		}
-		else {
-			data_dst = CustomData_get_layer(cd_dst, CD_MDEFORMVERT);
-		}
+		data_dst = CustomData_duplicate_referenced_layer(cd_dst, CD_MDEFORMVERT, num_elem_dst);
 	}
 
 	if (fromlayers == DT_LAYERS_ACTIVE_SRC || fromlayers >= 0) {
@@ -1270,13 +1259,12 @@ bool data_transfer_layersmapping_vgroups(
 			idx_src = fromlayers;
 			BLI_assert(idx_src < BLI_listbase_count(&ob_src->defbase));
 		}
-		else {
-			if ((idx_src = ob_src->actdef - 1) == -1){
-				return false;
-			}
+		else if ((idx_src = ob_src->actdef - 1) == -1) {
+			return false;
 		}
 
 		if (tolayers >= 0) {
+			/* Note: in this case we assume layer exists! */
 			idx_dst = tolayers;
 			BLI_assert(idx_dst < BLI_listbase_count(&ob_dst->defbase));
 		}
@@ -1287,8 +1275,7 @@ bool data_transfer_layersmapping_vgroups(
 					return true;
 				}
 				dg_src = BLI_findlink(&ob_src->defbase, idx_src);
-				BKE_defgroup_new(ob_dst, dg_src->name);
-				ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
+				BKE_object_defgroup_add_name(ob_dst, dg_src->name);
 				idx_dst = ob_dst->actdef - 1;
 			}
 		}
@@ -1301,8 +1288,7 @@ bool data_transfer_layersmapping_vgroups(
 				}
 				/* Create as much vgroups as necessary! */
 				for (; num <= idx_dst; num++) {
-					BKE_defgroup_new(ob_dst, DATA_("Group"));
-					ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
+					BKE_object_defgroup_add(ob_dst);
 				}
 			}
 		}
@@ -1312,8 +1298,7 @@ bool data_transfer_layersmapping_vgroups(
 				if (!use_create) {
 					return true;
 				}
-				BKE_defgroup_new(ob_dst, dg_src->name);
-				ob_dst->actdef = BLI_listbase_count(&ob_dst->defbase);
+				BKE_object_defgroup_add_name(ob_dst, dg_src->name);
 				idx_dst = ob_dst->actdef - 1;
 			}
 		}
@@ -1323,7 +1308,7 @@ bool data_transfer_layersmapping_vgroups(
 
 		if (r_map) {
 			/* At this stage, we **need** a valid CD_MDEFORMVERT layer on dest!
-			 * Again, use_create is not relevant in this case */
+			 * use_create is not relevant in this case */
 			if (!data_dst) {
 				data_dst = CustomData_add_layer(cd_dst, CD_MDEFORMVERT, CD_CALLOC, NULL, num_elem_dst);
 			}
