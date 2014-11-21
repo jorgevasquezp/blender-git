@@ -61,7 +61,7 @@ CustomDataMask BKE_object_data_transfer_dttypes_to_cdmask(const int dtdata_types
 	CustomDataMask cddata_mask = 0;
 	int i;
 
-	for (i = 0; i < 32; i++) {
+	for (i = 0; i < DT_TYPE_MAX; i++) {
 		const int dtdata_type = 1 << i;
 		int cddata_type;
 
@@ -94,7 +94,7 @@ bool BKE_object_data_transfer_get_dttypes_capacity(
 	*r_advanced_mixing = false;
 	*r_threshold = false;
 
-	for (i = 0; (i < 32) && !(ret && *r_advanced_mixing && *r_threshold); i++) {
+	for (i = 0; (i < DT_TYPE_MAX) && !(ret && *r_advanced_mixing && *r_threshold); i++) {
 		const int dtdata_type = 1 << i;
 
 		if (!(dtdata_types & dtdata_type)) {
@@ -158,7 +158,7 @@ int BKE_object_data_transfer_get_dttypes_item_types(const int dtdata_types)
 {
 	int i, ret = 0;
 
-	for (i = 0; (i < 32) && (ret ^ (ME_VERT | ME_EDGE | ME_LOOP | ME_POLY)); i++) {
+	for (i = 0; (i < DT_TYPE_MAX) && (ret ^ (ME_VERT | ME_EDGE | ME_LOOP | ME_POLY)); i++) {
 		const int dtdata_type = 1 << i;
 
 		if (!(dtdata_types & dtdata_type)) {
@@ -876,7 +876,7 @@ void BKE_object_data_transfer_layout(
 	}
 
 	/* Check all possible data types. */
-	for (i = 0; i < 32; i++) {
+	for (i = 0; i < DT_TYPE_MAX; i++) {
 		const int dtdata_type = 1 << i;
 		int cddata_type;
 		int fromlayers, tolayers, fromto_idx;
@@ -992,7 +992,7 @@ bool BKE_object_data_transfer_dm(
 
 	/* Check all possible data types.
 	 * Note item mappings and dest mix weights are cached. */
-	for (i = 0; i < 32; i++) {
+	for (i = 0; i < DT_TYPE_MAX; i++) {
 		const int dtdata_type = 1 << i;
 		int cddata_type;
 		int fromlayers, tolayers, fromto_idx;

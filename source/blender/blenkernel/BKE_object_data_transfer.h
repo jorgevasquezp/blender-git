@@ -61,6 +61,8 @@ enum {
 	DT_TYPE_UV                      = 1 << 24,
 	DT_TYPE_SHARP_FACE              = 1 << 25,
 	DT_TYPE_FREESTYLE_FACE          = 1 << 26,
+#define \
+	DT_TYPE_MAX                            27
 
 	DT_TYPE_VERT_ALL                = DT_TYPE_MDEFORMVERT | DT_TYPE_SHAPEKEY | DT_TYPE_SKIN | DT_TYPE_BWEIGHT_VERT,
 	DT_TYPE_EDGE_ALL                = DT_TYPE_SHARP_EDGE | DT_TYPE_SEAM | DT_TYPE_CREASE | DT_TYPE_BWEIGHT_EDGE |
@@ -68,6 +70,7 @@ enum {
 	DT_TYPE_LOOP_ALL                = DT_TYPE_VCOL | DT_TYPE_UV,
 	DT_TYPE_POLY_ALL                = DT_TYPE_UV | DT_TYPE_SHARP_FACE | DT_TYPE_FREESTYLE_FACE,
 };
+
 
 CustomDataMask BKE_object_data_transfer_dttypes_to_cdmask(const int dtdata_types);
 bool BKE_object_data_transfer_get_dttypes_capacity(
