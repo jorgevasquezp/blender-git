@@ -924,6 +924,8 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			num_trees = use_islands ? island_store.islands_num : 1;
 			treedata = MEM_callocN(sizeof(*treedata) * (size_t)num_trees, __func__);
 
+			printf("%d\n", num_trees);
+
 			if (use_islands) {
 				/* We expect our islands to contain poly indices, and a mapping loops -> islands indices.
 				 * This implies all loops of a same poly are in the same island. */
@@ -1199,7 +1201,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						}
 					}
 					else {
-						/* Else, we use source poly, indices stored in facs are those of polygons. */
+						/* Else, we use source poly, indices stored in islands_res are those of polygons. */
 						pidx_src = isld_res->index_src;
 						if (pidx_src >= 0) {
 							MPoly *mp_src = &polys_src[pidx_src];
