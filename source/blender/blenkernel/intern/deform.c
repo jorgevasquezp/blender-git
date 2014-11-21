@@ -1071,8 +1071,8 @@ static void vgroups_datatransfer_interp(const CustomDataTransferLayerMap *laymap
 {
 	MDeformVert **data_src = (MDeformVert **)sources;
 	MDeformVert *data_dst = (MDeformVert *)dest;
-	const int idx_src = laymap->data_n_src;
-	const int idx_dst = laymap->data_n_dst;
+	const int idx_src = laymap->data_src_n;
+	const int idx_dst = laymap->data_dst_n;
 
 	const int mix_mode = laymap->mix_mode;
 

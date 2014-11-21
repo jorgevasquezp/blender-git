@@ -432,8 +432,8 @@ typedef struct CustomDataTransferLayerMap {
 
 	void *data_src;      /* Data source array (can be regular CD data, vertices/edges/etc., keyblocks...). */
 	void *data_dst;      /* Data dest array (same type as dat_src). */
-	int data_n_src;      /* Index to affect in data_src (used e.g. for vgroups). */
-	int data_n_dst;      /* Index to affect in data_dst (used e.g. for vgroups). */
+	int   data_src_n;    /* Index to affect in data_src (used e.g. for vgroups). */
+	int   data_dst_n;    /* Index to affect in data_dst (used e.g. for vgroups). */
 	size_t elem_size;    /* Size of one element of data_src/data_dst. */
 
 	size_t data_size;    /* Size of actual data we transfer. */

@@ -313,7 +313,7 @@ static void data_transfer_interp_char(const CustomDataTransferLayerMap *laymap, 
 
 void data_transfer_layersmapping_add_item(
         ListBase *r_map, const int cddata_type, const int mix_mode, const float mix_factor, const float *mix_weights,
-        void *data_src, void *data_dst, const int data_n_src, const int data_n_dst,
+        void *data_src, void *data_dst, const int data_src_n, const int data_dst_n,
         const size_t elem_size, const size_t data_size, const size_t data_offset, const uint64_t data_flag,
         cd_datatransfer_interp interp)
 {
@@ -328,8 +328,8 @@ void data_transfer_layersmapping_add_item(
 
 	item->data_src = data_src;
 	item->data_dst = data_dst;
-	item->data_n_src = data_n_src;
-	item->data_n_dst = data_n_dst;
+	item->data_src_n = data_src_n;
+	item->data_dst_n = data_dst_n;
 	item->elem_size = elem_size;
 
 	item->data_size = data_size;
