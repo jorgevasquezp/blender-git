@@ -147,9 +147,13 @@ static int mesh_remap_interp_poly_data_get(
 
 static bool mesh_remap_bvhtree_query_nearest(
         BVHTreeFromMesh *treedata, BVHTreeNearest *nearest, const SpaceTransform *space_transform,
-        float co[3], const float max_dist_sq,
+        const float in_co[3], const float max_dist_sq,
         float *r_hit_dist)
 {
+	float co[3];
+
+	copy_v3_v3(co, in_co);
+
 	/* Convert the vertex to tree coordinates, if needed. */
 	if (space_transform) {
 		BLI_space_transform_apply(space_transform, co);
@@ -176,10 +180,14 @@ static bool mesh_remap_bvhtree_query_nearest(
 
 static bool mesh_remap_bvhtree_query_raycast(
         BVHTreeFromMesh *treedata, BVHTreeRayHit *rayhit, const SpaceTransform *space_transform,
-        float co[3], float no[3], const float radius, const float max_dist,
+        const float in_co[3], const float in_no[3], const float radius, const float max_dist,
         float *r_hit_dist)
 {
 	BVHTreeRayHit rayhit_tmp;
+	float co[3], no[3];
+
+	copy_v3_v3(co, in_co);
+	copy_v3_v3(no, in_no);
 
 	/* Convert the vertex to tree coordinates, if needed. */
 	if (space_transform) {
@@ -720,7 +728,6 @@ void BKE_mesh_remap_calc_edges_from_dm(
 
 					while (n--) {
 						/* Note we handle dest to src space conversion ourself, here! */
-
 						if (mesh_remap_bvhtree_query_raycast(
 						        &treedata, &rayhit, NULL,
 						        tmp_co, tmp_no, ray_radius / w, max_dist, &hit_dist))
@@ -1106,9 +1113,16 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						copy_v3_v3(tmp_co, verts_dst[ml_dst->v].co);
 						copy_v3_v3(tmp_no, loop_nors_dst[plidx_dst + mp_dst->loopstart]);
 
+						/* We do our transform here, since we may do several raycast/nearest queries. */
+						if (space_transform) {
+							BLI_space_transform_apply(space_transform, tmp_co);
+							BLI_space_transform_apply_normal(space_transform, tmp_no);
+						}
+
 						while (n--) {
+							/* Note we handle dest to src space conversion ourself, here! */
 							if (mesh_remap_bvhtree_query_raycast(
-							        tdata, &rayhit, space_transform,
+							        tdata, &rayhit, NULL,
 							        tmp_co, tmp_no, ray_radius / w, max_dist, &hit_dist))
 							{
 								islands_res[tindex][plidx_dst].factor = (hit_dist ? (1.0f / hit_dist) : 1e18f) * w;
@@ -1121,10 +1135,33 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							w /= MREMAP_RAYCAST_APPROXIMATE_FAC;
 						}
 						if (n == -1) {
-							/* No source for this dest loop! */
+							/* Fallback to 'nearest' hit here, loops usually comes in 'face group', not good to
+							 * have only part of one dest face's loops to map to source.
+							 * Note that since we give this a null weight, if whole weight for a given face
+							 * is null, it means none of its loop mapped to this source island, hence we can skip it
+							 * later.
+							 */
+							copy_v3_v3(tmp_co, verts_dst[ml_dst->v].co);
+							nearest.index = -1;
+
+							/* In any case, this fallback nearest hit should have no weight at all
+							 * in 'best island' decision! */
 							islands_res[tindex][plidx_dst].factor = 0.0f;
-							islands_res[tindex][plidx_dst].hit_dist = FLT_MAX;
-							islands_res[tindex][plidx_dst].index_src = -1;
+
+							/* Note we handle dest to src space conversion ourself, here! */
+							if (mesh_remap_bvhtree_query_nearest(
+							        tdata, &nearest, NULL,
+							        tmp_co, max_dist_sq, &hit_dist))
+							{
+								islands_res[tindex][plidx_dst].hit_dist = hit_dist;
+								islands_res[tindex][plidx_dst].index_src = orig_poly_index_src[nearest.index];
+								copy_v3_v3(islands_res[tindex][plidx_dst].hit_point, nearest.co);
+							}
+							else {
+								/* No source for this dest loop! */
+								islands_res[tindex][plidx_dst].hit_dist = FLT_MAX;
+								islands_res[tindex][plidx_dst].index_src = -1;
+							}
 						}
 					}
 					else {  /* Nearest poly either to use all its loops/verts or just closest one. */
