@@ -932,9 +932,12 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			treedata = MEM_callocN(sizeof(*treedata) * (size_t)num_trees, __func__);
 
 			if (use_islands) {
-				/* We expect our islands to contain poly indices, and a mapping loops -> islands indices.
+				/* We expect our islands to contain poly indices, with edge indices of 'inner cuts',
+				 * and a mapping loops -> islands indices.
 				 * This implies all loops of a same poly are in the same island. */
-				BLI_assert((island_store.item_type == MISLAND_TYPE_LOOP) && (island_store.island_type == MISLAND_TYPE_POLY));
+				BLI_assert((island_store.item_type == MISLAND_TYPE_LOOP) &&
+				           (island_store.island_type == MISLAND_TYPE_POLY) &&
+				           (island_store.innercut_type == MISLAND_TYPE_EDGE));
 			}
 		}
 		else {

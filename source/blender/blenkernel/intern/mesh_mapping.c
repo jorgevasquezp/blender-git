@@ -32,6 +32,7 @@
 #include "DNA_meshdata_types.h"
 
 #include "BLI_utildefines.h"
+#include "BLI_bitmap.h"
 #include "BLI_math.h"
 
 #include "BKE_mesh_mapping.h"
@@ -387,14 +388,16 @@ typedef bool (*MeshRemap_CheckIslandBoundary)(
         const struct MPoly *mpoly, const struct MLoop *mloop, const struct MEdge *medge,
         const int nbr_egde_users);
 
-static void poly_loop_islands_calc(
+static void poly_edge_loop_islands_calc(
         const MEdge *medge, const int totedge, const MPoly *mpoly, const int totpoly,
-        const MLoop *mloop, const int totloop, const bool use_bitflags,
-        MeshRemap_CheckIslandBoundary edge_boundary_check,
-        int **r_poly_groups, int *r_totgroup)
+        const MLoop *mloop, const int totloop, MeshElemMap *edge_poly_map,
+        const bool use_bitflags, MeshRemap_CheckIslandBoundary edge_boundary_check,
+        int **r_poly_groups, int *r_totgroup, BLI_bitmap **r_edge_borders, int *r_totedgeborder)
 {
 	int *poly_groups;
 	int *poly_stack;
+
+	BLI_bitmap *edge_borders = NULL;
 
 	int poly_prev = 0;
 	const int temp_poly_group_id = 3;  /* Placeholder value. */
@@ -403,19 +406,26 @@ static void poly_loop_islands_calc(
 	bool group_id_overflow = false;
 
 	/* map vars */
-	MeshElemMap *edge_poly_map;
-	int *edge_poly_mem;
+	int *edge_poly_mem = NULL;
 
 	if (totpoly == 0) {
 		*r_totgroup = 0;
 		*r_poly_groups = NULL;
+		if (r_edge_borders) {
+			*r_edge_borders = NULL;
+		}
 		return;
 	}
 
-	BKE_mesh_edge_poly_map_create(&edge_poly_map, &edge_poly_mem,
-	                              medge, totedge,
-	                              mpoly, totpoly,
-	                              mloop, totloop);
+	if (r_edge_borders) {
+		edge_borders = BLI_BITMAP_NEW(totedge, __func__);
+		*r_totedgeborder = 0;
+	}
+
+	if (!edge_poly_map) {
+		BKE_mesh_edge_poly_map_create(&edge_poly_map, &edge_poly_mem,
+		                              medge, totedge, mpoly, totpoly, mloop, totloop);
+	}
 
 	poly_groups = MEM_callocN(sizeof(int) * (size_t)totpoly, __func__);
 	poly_stack  = MEM_mallocN(sizeof(int) * (size_t)totpoly, __func__);
@@ -456,8 +466,9 @@ static void poly_loop_islands_calc(
 			mp = &mpoly[poly];
 			for (ml = &mloop[mp->loopstart], j = mp->totloop; j--; ml++) {
 				/* loop over poly users */
-				const MEdge *me = &medge[ml->e];
-				const MeshElemMap *map_ele = &edge_poly_map[ml->e];
+				const int me_idx = (int)ml->e;
+				const MEdge *me = &medge[me_idx];
+				const MeshElemMap *map_ele = &edge_poly_map[me_idx];
 				const int *p = map_ele->indices;
 				int i = map_ele->count;
 				if (!edge_boundary_check(mp, ml, me, i)) {
@@ -471,14 +482,20 @@ static void poly_loop_islands_calc(
 						}
 					}
 				}
-				else if (use_bitflags) {
-					/* Find contiguous smooth groups already assigned, these are the values we can't reuse! */
-					for (; i--; p++) {
-						int bit = poly_groups[*p];
-						if (!ELEM(bit, 0, poly_group_id, poly_group_id_overflowed) &&
-						    !(bit_poly_group_mask & bit))
-						{
-							bit_poly_group_mask |= bit;
+				else {
+					if (edge_borders && !BLI_BITMAP_TEST(edge_borders, me_idx)) {
+						BLI_BITMAP_ENABLE(edge_borders, me_idx);
+						r_totedgeborder++;
+					}
+					if (use_bitflags) {
+						/* Find contiguous smooth groups already assigned, these are the values we can't reuse! */
+						for (; i--; p++) {
+							int bit = poly_groups[*p];
+							if (!ELEM(bit, 0, poly_group_id, poly_group_id_overflowed) &&
+							    !(bit_poly_group_mask & bit))
+							{
+								bit_poly_group_mask |= bit;
+							}
 						}
 					}
 				}
@@ -531,12 +548,17 @@ static void poly_loop_islands_calc(
 		tot_group++;
 	}
 
-	MEM_freeN(edge_poly_map);
-	MEM_freeN(edge_poly_mem);
+	if (edge_poly_mem) {
+		MEM_freeN(edge_poly_map);
+		MEM_freeN(edge_poly_mem);
+	}
 	MEM_freeN(poly_stack);
 
 	*r_totgroup = tot_group;
 	*r_poly_groups = poly_groups;
+	if (r_edge_borders) {
+		*r_edge_borders = edge_borders;
+	}
 }
 
 static bool poly_is_island_boundary_smooth_cb(
@@ -562,17 +584,18 @@ int *BKE_mesh_calc_smoothgroups(const MEdge *medge, const int totedge,
 {
 	int *poly_groups = NULL;
 
-	poly_loop_islands_calc(
-	        medge, totedge, mpoly, totpoly, mloop, totloop, use_bitflags,
-	        poly_is_island_boundary_smooth_cb, &poly_groups, r_totgroup);
+	poly_edge_loop_islands_calc(
+	        medge, totedge, mpoly, totpoly, mloop, totloop, NULL, use_bitflags,
+	        poly_is_island_boundary_smooth_cb, &poly_groups, r_totgroup, NULL, NULL);
 
 	return poly_groups;
 }
 
+#define MISLAND_DEFAULT_BUFSIZE 64
 
 void BKE_mesh_loop_islands_init(
         MeshIslandStore *island_store,
-        const short item_type, const int items_num, const short island_type)
+        const short item_type, const int items_num, const short island_type, const short innercut_type)
 {
 	MemArena *mem = island_store->mem;
 
@@ -589,21 +612,27 @@ void BKE_mesh_loop_islands_init(
 	island_store->items_to_islands = BLI_memarena_alloc(mem, sizeof(*island_store->items_to_islands) * (size_t)items_num);
 
 	island_store->island_type = island_type;
-	island_store->islands_num_alloc = 64;
+	island_store->islands_num_alloc = MISLAND_DEFAULT_BUFSIZE;
 	island_store->islands = BLI_memarena_alloc(mem, sizeof(*island_store->islands) * island_store->islands_num_alloc);
+
+	island_store->innercut_type = innercut_type;
+	island_store->innercuts = BLI_memarena_alloc(mem, sizeof(*island_store->innercuts) * island_store->islands_num_alloc);
 
 	island_store->mem = mem;
 }
 
 void BKE_mesh_loop_islands_clear(MeshIslandStore *island_store)
 {
-	island_store->item_type = 0;
+	island_store->item_type = MISLAND_TYPE_NONE;
 	island_store->items_to_islands_num = 0;
 	island_store->items_to_islands = NULL;
 
-	island_store->island_type = 0;
+	island_store->island_type = MISLAND_TYPE_NONE;
 	island_store->islands_num = 0;
 	island_store->islands = NULL;
+
+	island_store->innercut_type = MISLAND_TYPE_NONE;
+	island_store->innercuts = NULL;
 
 	if (island_store->mem) {
 		BLI_memarena_clear(island_store->mem);
@@ -622,11 +651,12 @@ void BKE_mesh_loop_islands_free(MeshIslandStore *island_store)
 
 void BKE_mesh_loop_islands_add(
         MeshIslandStore *island_store, const int item_num, int *items_indices,
-        const int num_island_items, int *island_item_indices)
+        const int num_island_items, int *island_item_indices,
+        const int num_innercut_items, int *innercut_item_indices)
 {
 	MemArena *mem = island_store->mem;
 
-	MeshElemMap *isld;
+	MeshElemMap *isld, *innrcut;
 	const int curr_island_idx = island_store->islands_num++;
 	const size_t curr_num_islands = (size_t)island_store->islands_num;
 	int i = item_num;
@@ -637,19 +667,27 @@ void BKE_mesh_loop_islands_add(
 	}
 
 	if (UNLIKELY(curr_num_islands > island_store->islands_num_alloc)) {
-		MeshElemMap **islds;
+		MeshElemMap **islds, **innrcuts;
 
 		island_store->islands_num_alloc *= 2;
 		islds = BLI_memarena_alloc(mem, sizeof(*islds) * island_store->islands_num_alloc);
 		memcpy(islds, island_store->islands, sizeof(*islds) * (curr_num_islands - 1));
 		island_store->islands = islds;
+
+		innrcuts = BLI_memarena_alloc(mem, sizeof(*innrcuts) * island_store->islands_num_alloc);
+		memcpy(innrcuts, island_store->innercuts, sizeof(*innrcuts) * (curr_num_islands - 1));
+		island_store->innercuts = innrcuts;
 	}
 
 	island_store->islands[curr_island_idx] = isld = BLI_memarena_alloc(mem, sizeof(*isld));
-
 	isld->count = num_island_items;
 	isld->indices = BLI_memarena_alloc(mem, sizeof(*isld->indices) * (size_t)num_island_items);
 	memcpy(isld->indices, island_item_indices, sizeof(*isld->indices) * (size_t)num_island_items);
+
+	island_store->innercuts[curr_island_idx] = innrcut = BLI_memarena_alloc(mem, sizeof(*innrcut));
+	innrcut->count = num_innercut_items;
+	innrcut->indices = BLI_memarena_alloc(mem, sizeof(*innrcut->indices) * (size_t)num_innercut_items);
+	memcpy(innrcut->indices, innercut_item_indices, sizeof(*innrcut->indices) * (size_t)num_innercut_items);
 }
 
 /* TODO: I'm not sure edge seam flag is enough to define UV islands? Maybe we should also consider UVmaps values
@@ -675,33 +713,56 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
         MEdge *edges, const int totedge,
         MPoly *polys, const int totpoly,
         MLoop *loops, const int totloop,
-
         MeshIslandStore *r_island_store)
 {
 	int *poly_groups = NULL;
 	int num_poly_groups;
 
+	/* map vars */
+	MeshElemMap *edge_poly_map;
+	int *edge_poly_mem;
+
 	int *poly_indices = MEM_mallocN(sizeof(*poly_indices) * (size_t)totpoly, __func__);
 	int *loop_indices = MEM_mallocN(sizeof(*loop_indices) * (size_t)totloop, __func__);
 	int num_pidx, num_lidx;
 
+	/* Those are used to detect 'inner cuts', i.e. edges that are borders, and yet have two or more polys of
+	 * a same group using them (typical case: seam used to unwrap properly a cylinder). */
+	BLI_bitmap *edge_borders;
+	int num_edge_borders;
+	char *edge_border_count = NULL;
+	int *edge_innercut_indices = NULL;
+	int num_einnercut_idx = 0;
+
 	int grp_idx, p_idx, pl_idx, l_idx;
 
 	BKE_mesh_loop_islands_clear(r_island_store);
-	BKE_mesh_loop_islands_init(r_island_store, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY);
+	BKE_mesh_loop_islands_init(r_island_store, MISLAND_TYPE_LOOP, totloop, MISLAND_TYPE_POLY, MISLAND_TYPE_EDGE);
 
-	poly_loop_islands_calc(
-	        edges, totedge, polys, totpoly, loops, totloop, false,
-	        mesh_check_island_boundary_uv, &poly_groups, &num_poly_groups);
+	BKE_mesh_edge_poly_map_create(&edge_poly_map, &edge_poly_mem,
+	                              edges, totedge, polys, totpoly, loops, totloop);
+
+	poly_edge_loop_islands_calc(
+	        edges, totedge, polys, totpoly, loops, totloop, edge_poly_map, false,
+	        mesh_check_island_boundary_uv, &poly_groups, &num_poly_groups, &edge_borders, &num_edge_borders);
 
 	if (!num_poly_groups) {
 		/* Should never happen... */
 		return false;
 	}
 
+	if (num_edge_borders) {
+		edge_border_count = MEM_mallocN(sizeof(*edge_border_count) * (size_t)totedge, __func__);
+		edge_innercut_indices = MEM_mallocN(sizeof(*edge_innercut_indices) * (size_t)num_edge_borders, __func__);
+	}
+
 	/* Note: here we ignore '0' invalid group - this should *never* happen in this case anyway? */
 	for (grp_idx = 1; grp_idx <= num_poly_groups; grp_idx++) {
 		num_pidx = num_lidx = 0;
+		if (num_edge_borders) {
+			num_einnercut_idx = 0;
+			memset(edge_border_count, 0, sizeof(*edge_border_count) * (size_t)totedge);
+		}
 
 		for (p_idx = 0; p_idx < totpoly; p_idx++) {
 			MPoly *mp;
@@ -713,17 +774,28 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 			mp = &polys[p_idx];
 			poly_indices[num_pidx++] = p_idx;
 			for (l_idx = mp->loopstart, pl_idx = 0; pl_idx < mp->totloop; l_idx++, pl_idx++) {
+				MLoop *ml = &loops[l_idx];
 				loop_indices[num_lidx++] = l_idx;
+				if (num_edge_borders && BLI_BITMAP_TEST(edge_borders, ml->e) && (edge_border_count[ml->e] < 2)) {
+					edge_border_count[ml->e]++;
+					if (edge_border_count[ml->e] == 2) {
+						edge_innercut_indices[num_einnercut_idx++] = (int)ml->e;
+					}
+				}
 			}
 		}
 
-		BKE_mesh_loop_islands_add(r_island_store, num_lidx, loop_indices, num_pidx, poly_indices);
+		BKE_mesh_loop_islands_add(r_island_store, num_lidx, loop_indices, num_pidx, poly_indices,
+		                          num_einnercut_idx, edge_innercut_indices);
 	}
 
 	MEM_freeN(poly_indices);
 	MEM_freeN(loop_indices);
 	MEM_freeN(poly_groups);
-
+	if (num_edge_borders) {
+		MEM_freeN(edge_border_count);
+		MEM_freeN(edge_innercut_indices);
+	}
 	return true;
 }
 

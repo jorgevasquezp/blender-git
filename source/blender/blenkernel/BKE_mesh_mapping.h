@@ -132,6 +132,7 @@ void BKE_mesh_origindex_map_create(
 
 /* Loop islands data helpers. */
 enum {
+	MISLAND_TYPE_NONE = 0,
 	MISLAND_TYPE_VERT = 1,
 	MISLAND_TYPE_EDGE = 2,
 	MISLAND_TYPE_POLY = 3,
@@ -139,27 +140,30 @@ enum {
 };
 
 typedef struct MeshIslandStore {
-	short item_type;    /* MISLAND_TYPE_... */
-	short island_type;  /* MISLAND_TYPE_... */
+	short item_type;      /* MISLAND_TYPE_... */
+	short island_type;    /* MISLAND_TYPE_... */
+	short innercut_type;  /* MISLAND_TYPE_... */
 
 	int  items_to_islands_num;
 	int *items_to_islands;  /* map the item to the island index */
 
 	int                  islands_num;
 	size_t               islands_num_alloc;
-	struct MeshElemMap **islands;  /* Array of pointers, one item per island. */
+	struct MeshElemMap **islands;    /* Array of pointers, one item per island. */
+	struct MeshElemMap **innercuts;  /* Array of pointers, one item per island. */
 
 	struct MemArena *mem;  /* Memory arena, internal use only. */
 } MeshIslandStore;
 
 void BKE_mesh_loop_islands_init(
         MeshIslandStore *island_store,
-        const short item_type, const int item_num, const short island_type);
+        const short item_type, const int item_num, const short island_type, const short innercut_type);
 void BKE_mesh_loop_islands_clear(MeshIslandStore *island_store);
 void BKE_mesh_loop_islands_free(MeshIslandStore *island_store);
 void BKE_mesh_loop_islands_add(
         MeshIslandStore *islands, const int item_num, int *item_indices,
-        const int num_island_items, int *island_item_indices);
+        const int num_island_items, int *island_item_indices,
+        const int num_innercut_items, int *innercut_item_indices);
 
 typedef bool (*MeshRemapIslandsCalc)(
         struct MVert *verts, const int totvert,
