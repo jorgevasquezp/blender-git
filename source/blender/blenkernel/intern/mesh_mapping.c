@@ -398,6 +398,7 @@ static void poly_edge_loop_islands_calc(
 	int *poly_stack;
 
 	BLI_bitmap *edge_borders = NULL;
+	int num_edgeborders = 0;
 
 	int poly_prev = 0;
 	const int temp_poly_group_id = 3;  /* Placeholder value. */
@@ -413,6 +414,7 @@ static void poly_edge_loop_islands_calc(
 		*r_poly_groups = NULL;
 		if (r_edge_borders) {
 			*r_edge_borders = NULL;
+			*r_totedgeborder = 0;
 		}
 		return;
 	}
@@ -485,7 +487,7 @@ static void poly_edge_loop_islands_calc(
 				else {
 					if (edge_borders && !BLI_BITMAP_TEST(edge_borders, me_idx)) {
 						BLI_BITMAP_ENABLE(edge_borders, me_idx);
-						r_totedgeborder++;
+						num_edgeborders++;
 					}
 					if (use_bitflags) {
 						/* Find contiguous smooth groups already assigned, these are the values we can't reuse! */
@@ -558,6 +560,7 @@ static void poly_edge_loop_islands_calc(
 	*r_poly_groups = poly_groups;
 	if (r_edge_borders) {
 		*r_edge_borders = edge_borders;
+		*r_totedgeborder = num_edgeborders;
 	}
 }
 
@@ -731,7 +734,7 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 	int num_edge_borders;
 	char *edge_border_count = NULL;
 	int *edge_innercut_indices = NULL;
-	int num_einnercut_idx = 0;
+	int num_einnercuts = 0;
 
 	int grp_idx, p_idx, pl_idx, l_idx;
 
@@ -759,7 +762,7 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 	for (grp_idx = 1; grp_idx <= num_poly_groups; grp_idx++) {
 		num_pidx = num_lidx = 0;
 		if (num_edge_borders) {
-			num_einnercut_idx = 0;
+			num_einnercuts = 0;
 			memset(edge_border_count, 0, sizeof(*edge_border_count) * (size_t)totedge);
 		}
 
@@ -778,14 +781,14 @@ bool BKE_mesh_calc_islands_loop_poly_uv(
 				if (num_edge_borders && BLI_BITMAP_TEST(edge_borders, ml->e) && (edge_border_count[ml->e] < 2)) {
 					edge_border_count[ml->e]++;
 					if (edge_border_count[ml->e] == 2) {
-						edge_innercut_indices[num_einnercut_idx++] = (int)ml->e;
+						edge_innercut_indices[num_einnercuts++] = (int)ml->e;
 					}
 				}
 			}
 		}
 
 		BKE_mesh_loop_islands_add(r_island_store, num_lidx, loop_indices, num_pidx, poly_indices,
-		                          num_einnercut_idx, edge_innercut_indices);
+		                          num_einnercuts, edge_innercut_indices);
 	}
 
 	MEM_freeN(poly_indices);

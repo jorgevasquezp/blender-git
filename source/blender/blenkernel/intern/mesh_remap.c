@@ -834,6 +834,14 @@ static void astar_path_graph_init(AStarPathGraph *as_graph, const int node_num, 
 	as_graph->custom_data = custom_data;
 }
 
+static void astar_path_graph_free(AStarPathGraph *as_graph)
+{
+	if (as_graph->mem) {
+		BLI_memarena_free(as_graph->mem);
+		as_graph->mem = NULL;
+	}
+}
+
 static void astar_path_node_init(AStarPathGraph *as_graph, const int node_index, void *custom_data)
 {
 	as_graph->nodes[node_index].custom_data = custom_data;
@@ -921,13 +929,17 @@ static bool astar_solve(
 	float *g_costs = r_solution->g_costs;
 	int *g_steps = r_solution->g_steps;
 
-	todo_nodes = BLI_heap_new();
-
 	prev_nodes[node_index_src] = -1;
+	BLI_BITMAP_SET_ALL(done_nodes, false, as_graph->node_num);
 	fill_vn_fl(g_costs, as_graph->node_num, FLT_MAX);
 	g_costs[node_index_src] = 0.0f;
 	g_steps[node_index_src] = 0;
 
+	if (node_index_src == node_index_dst) {
+		return true;
+	}
+
+	todo_nodes = BLI_heap_new();
 	BLI_heap_insert(todo_nodes,
 	                f_cost_cb(as_graph, r_solution, NULL, -1, node_index_src, node_index_dst),
 	                SET_INT_IN_POINTER(node_index_src));
@@ -942,9 +954,9 @@ static bool astar_solve(
 			continue;
 		}
 
-		/* If we are limited in amount of steps to find a path, fail if we reached limit. */
+		/* If we are limited in amount of steps to find a path, skip if we reached limit. */
 		if (max_steps && g_steps[node_curr_idx] > max_steps) {
-			break;
+			continue;
 		}
 
 		if (node_curr_idx == node_index_dst) {
@@ -1000,7 +1012,7 @@ static void mesh_island_to_astar_path_graph_edge_process(
         MeshIslandStore *islands, const int island_index, AStarPathGraph *as_graph,
         MVert *verts, MPoly *polys, MLoop *loops,
         const int edge_idx, BLI_bitmap *done_edges, MeshElemMap *edge_to_poly_map, const bool is_einnercut,
-        int *poly_isld_indices, float (*poly_centers)[3], unsigned char *poly_status)
+        int *poly_isld_index_map, float (*poly_centers)[3], unsigned char *poly_status)
 {
 	int *p_isld_indices = BLI_array_alloca(p_isld_indices, (size_t)edge_to_poly_map[edge_idx].count);
 	int i, j;
@@ -1008,7 +1020,7 @@ static void mesh_island_to_astar_path_graph_edge_process(
 	for (i = 0; i < edge_to_poly_map[edge_idx].count; i++) {
 		const int p_idx = edge_to_poly_map[edge_idx].indices[i];
 		MPoly *mp = &polys[p_idx];
-		const int p_isld_idx = islands ? poly_isld_indices[p_idx] : p_idx;
+		const int p_isld_idx = islands ? poly_isld_index_map[p_idx] : p_idx;
 
 		if (UNLIKELY(islands && (islands->items_to_islands[mp->loopstart] != island_index))) {
 			/* poly not in current island, happens with border edges... */
@@ -1053,7 +1065,7 @@ static void mesh_island_to_astar_path_graph(
 	MeshElemMap *island_poly_map = islands ? islands->islands[island_index] : NULL;
 	MeshElemMap *island_einnercut_map = islands ? islands->innercuts[island_index] : NULL;
 
-	int *poly_isld_indices = islands ? MEM_mallocN(sizeof(*poly_isld_indices) * (size_t)numpolys, __func__) : NULL;
+	int *poly_isld_index_map = NULL;
 	BLI_bitmap *done_edges = BLI_BITMAP_NEW(numedges, __func__);
 
 	const int node_num = islands ? island_poly_map->count : numpolys;
@@ -1064,19 +1076,23 @@ static void mesh_island_to_astar_path_graph(
 	int i;
 
 	astar_path_graph_init(r_as_graph, node_num, NULL);
-	/* polycenters are owned by graph memarena. */
+	/* poly_centers is owned by graph memarena. */
 	poly_centers = BLI_memarena_calloc(r_as_graph->mem, sizeof(*poly_centers) * (size_t)node_num);
 
 	if (islands) {
+		/* poly_isld_index_map is owned by graph memarena. */
+		poly_isld_index_map = BLI_memarena_calloc(r_as_graph->mem, sizeof(*poly_isld_index_map) * (size_t)numpolys);
 		for (i = island_poly_map->count; i--;) {
-			poly_isld_indices[island_poly_map->indices[i]] = i;
+			poly_isld_index_map[island_poly_map->indices[i]] = i;
 		}
+
+		r_as_graph->custom_data = poly_isld_index_map;
 
 		for (i = island_einnercut_map->count; i--;) {
 			mesh_island_to_astar_path_graph_edge_process(
 			        islands, island_index, r_as_graph, verts, polys, loops,
 			        island_einnercut_map->indices[i], done_edges, edge_to_poly_map, true,
-			        poly_isld_indices, poly_centers, poly_status);
+			        poly_isld_index_map, poly_centers, poly_status);
 		}
 	}
 
@@ -1099,14 +1115,11 @@ static void mesh_island_to_astar_path_graph(
 			mesh_island_to_astar_path_graph_edge_process(
 			        islands, island_index, r_as_graph, verts, polys, loops,
 			        (int)ml->e, done_edges, edge_to_poly_map, false,
-			        poly_isld_indices, poly_centers, poly_status);
+			        poly_isld_index_map, poly_centers, poly_status);
 		}
 		poly_status[p_isld_idx] = POLY_COMPLETE;
 	}
 
-	if (islands) {
-		MEM_freeN(poly_isld_indices);
-	}
 	MEM_freeN(done_edges);
 	MEM_freeN(poly_status);
 }
@@ -1115,6 +1128,29 @@ static void mesh_island_to_astar_path_graph(
 #undef POLY_CENTER_INIT
 #undef POLY_COMPLETE
 
+/* Our 'f_cost' callback func, to find shortest poly-path between two remapped-loops.
+ * Note we do not want to make innercuts 'walls' here, just detect when the shortest path goes by those. */
+static float mesh_remap_calc_loops_astar_f_cost(
+        AStarPathGraph *as_graph, AStarPathSolution *as_solution, AStarPathLink *link,
+        const int node_idx_curr, const int node_idx_next, const int node_idx_dst)
+{
+	float *co_next, *co_dest;
+
+	if (link && GET_INT_FROM_POINTER(link->custom_data)) {
+		/* An innercut edge... We tag our solution as potentially crossing innercuts.
+		 * Note it might not be the case in the end (AStar will explore around optimal path), but helps
+		 * trimming off some processing later... */
+		if (!GET_INT_FROM_POINTER(as_solution->custom_data)) {
+			as_solution->custom_data = SET_INT_IN_POINTER(true);
+		}
+	}
+
+	/* Our heuristic part of current f_cost is distance from next node to destination one.
+	 * It is guaranteed to be less than actual shortest poly-path between next node and destination one. */
+	co_next = (float *)as_graph->nodes[node_idx_next].custom_data;
+	co_dest = (float *)as_graph->nodes[node_idx_dst].custom_data;
+	return (link ? (as_solution->g_costs[node_idx_curr] + link->cost) : 0.0f) + len_v3v3(co_next, co_dest);
+}
 
 void BKE_mesh_remap_calc_loops_from_dm(
         const int mode, const SpaceTransform *space_transform, const float max_dist, const float ray_radius,
@@ -1149,8 +1185,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		const bool use_from_vert = (mode & MREMAP_USE_VERT);
 
 		MeshIslandStore island_store = {0};
-		AStarPathGraph *as_graphdata = NULL;
 		bool use_islands = false;
+
+		AStarPathGraph *as_graphdata = NULL;
+		AStarPathSolution as_solution = {{0}};
 
 		float (*poly_nors_src)[3] = NULL;
 		float (*loop_nors_src)[3] = NULL;
@@ -1163,6 +1201,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		int *vert_to_poly_map_src_buff = NULL;
 		MeshElemMap *edge_to_poly_map = NULL;
 		int *edge_to_poly_map_buff = NULL;
+		int *loop_to_poly_map_src = NULL;
 
 		bool verts_allocated_src;
 		MVert *verts_src = DM_get_vert_array(dm_src, &verts_allocated_src);
@@ -1260,6 +1299,15 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		/* Needed for islands (or plain mesh) to AStar graph conversion. */
 		BKE_mesh_edge_poly_map_create(&edge_to_poly_map, &edge_to_poly_map_buff,
 		                              edges_src, num_edges_src, polys_src, num_polys_src, loops_src, num_loops_src);
+		if (use_from_vert) {
+			loop_to_poly_map_src = MEM_mallocN(sizeof(*loop_to_poly_map_src) * (size_t)num_loops_src, __func__);
+			for (pidx_src = 0; pidx_src < num_polys_src; pidx_src++) {
+				MPoly *mp = &polys_src[pidx_src];
+				for (plidx_src = 0, lidx_src = mp->loopstart; plidx_src < mp->totloop; plidx_src++, lidx_src++) {
+					loop_to_poly_map_src[lidx_src] = pidx_src;
+				}
+			}
+		}
 
 		/* Island makes things slightly more complex here.
 		 * Basically, we:
@@ -1552,6 +1600,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 			/* And now, find best island to use! */
 			{
+				AStarPathGraph *as_graph = NULL;
+				int *poly_isld_index_map = NULL;
+				int pidx_src_org, pidx_src_prev = -1;
+
 				float best_island_fac = 0.0f;
 				int best_island_index = -1;
 
@@ -1569,24 +1621,52 @@ void BKE_mesh_remap_calc_loops_from_dm(
 					}
 				}
 
+				if (best_island_index != -1) {
+					as_graph = &as_graphdata[best_island_index];
+					poly_isld_index_map = (int *)as_graph->custom_data;
+					astar_path_solution_init(as_graph, &as_solution, false);
+				}
+
 				for (plidx_dst = 0; plidx_dst < mp_dst->totloop; plidx_dst++) {
 					IslandResult *isld_res;
 					lidx_dst = plidx_dst + mp_dst->loopstart;
 
-					if (best_island_index < 0) {
+					if (best_island_index == -1) {
 						/* No source for any loops of our dest poly in any source islands. */
 						BKE_mesh_remap_item_define_invalid(r_map, lidx_dst);
 						continue;
 					}
+
+					as_solution.custom_data = SET_INT_IN_POINTER(false);
 
 					isld_res = &islands_res[best_island_index][plidx_dst];
 					if (use_from_vert) {
 						/* Indices stored in islands_res are those of loops, one per dest loop. */
 						lidx_src = isld_res->index_src;
 						if (lidx_src >= 0) {
+							pidx_src = loop_to_poly_map_src[lidx_src];
+							if (pidx_src_prev == -1) {
+								pidx_src_org = pidx_src;
+							}
+							/* If prev and curr poly are the same, no need to do anything more!!! */
+							else if (pidx_src_prev != pidx_src) {
+								astar_solve(as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
+								            mesh_remap_calc_loops_astar_f_cost, &as_solution, 4);
+								if (GET_INT_FROM_POINTER(as_solution.custom_data)) {
+									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
+									 * before that edge.
+									 * Note we could try to be much smarter (like e.g. storing a whole poly's indices,
+									 * and making decision (one which side of cutting edge(s!) to be on the end,
+									 * but this is one more level of complexity, better to first see if
+									 * simple solution works!
+									 */
+									//printf("%d, %d\n", as_solution.steps, GET_INT_FROM_POINTER(as_solution.custom_data));
+								}
+							}
 							mesh_remap_item_define(
 							        r_map, lidx_dst, isld_res->hit_dist,
 							        best_island_index, 1, &lidx_src, &full_weight);
+							pidx_src_prev = pidx_src;
 						}
 						else {
 							/* No source for this loop in this island. */
@@ -1603,6 +1683,25 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							MPoly *mp_src = &polys_src[pidx_src];
 							float *hit_co = isld_res->hit_point;
 							int best_loop_index_src;
+
+							if (pidx_src_prev == -1) {
+								pidx_src_org = pidx_src;
+							}
+							/* If prev and curr poly are the same, no need to do anything more!!! */
+							else if (pidx_src_prev != pidx_src) {
+								astar_solve(as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
+								            mesh_remap_calc_loops_astar_f_cost, &as_solution, 4);
+								if (GET_INT_FROM_POINTER(as_solution.custom_data)) {
+									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
+									 * before that edge.
+									 * Note we could try to be much smarter (like e.g. storing a whole poly's indices,
+									 * and making decision (one which side of cutting edge(s!) to be on the end,
+									 * but this is one more level of complexity, better to first see if
+									 * simple solution works!
+									 */
+									//printf("%d, %d\n", as_solution.steps, GET_INT_FROM_POINTER(as_solution.custom_data));
+								}
+							}
 
 							if (mode == MREMAP_MODE_LOOP_POLY_NEAREST) {
 								mesh_remap_interp_poly_data_get(
@@ -1625,6 +1724,8 @@ void BKE_mesh_remap_calc_loops_from_dm(
 								        isld_res->hit_dist, best_island_index,
 								        sources_num, indices_interp, weights_interp);
 							}
+
+							pidx_src_prev = pidx_src;
 						}
 						else {
 							/* No source for this loop in this island. */
@@ -1633,13 +1734,22 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						}
 					}
 				}
+
+				astar_path_solution_clear(&as_solution);
 			}
 		}
 
 		for (tindex = 0; tindex < num_trees; tindex++) {
 			MEM_freeN(islands_res[tindex]);
+			free_bvhtree_from_mesh(&treedata[tindex]);
+			astar_path_graph_free(&as_graphdata[tindex]);
 		}
 		MEM_freeN(islands_res);
+		BKE_mesh_loop_islands_free(&island_store);
+		MEM_freeN(treedata);
+		MEM_freeN(as_graphdata);
+		astar_path_solution_free(&as_solution);
+
 		if (verts_allocated_src) {
 			MEM_freeN(verts_src);
 		}
@@ -1664,7 +1774,12 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		if (vert_to_poly_map_src_buff) {
 			MEM_freeN(vert_to_poly_map_src_buff);
 		}
-		MEM_freeN(edge_to_poly_map_buff);
+		if (edge_to_poly_map_buff) {
+			MEM_freeN(edge_to_poly_map_buff);
+		}
+		if (loop_to_poly_map_src) {
+			MEM_freeN(loop_to_poly_map_src);
+		}
 		if (vcos_interp) {
 			MEM_freeN(vcos_interp);
 		}
@@ -1674,9 +1789,6 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		if (weights_interp) {
 			MEM_freeN(weights_interp);
 		}
-		BKE_mesh_loop_islands_free(&island_store);
-		MEM_freeN(treedata);
-		MEM_freeN(as_graphdata);
 	}
 }
 
