@@ -29,8 +29,6 @@
  *  \ingroup spnode
  */
 
-#include <errno.h>
-
 #include "MEM_guardedalloc.h"
 
 #include "DNA_node_types.h"
@@ -305,41 +303,12 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	bNode *node;
-	Image *ima = NULL;
+	Image *ima;
 	int type = 0;
 
-	const bool is_relative_path = RNA_boolean_get(op->ptr, "relative_path");
-
-	/* check input variables */
-	if (RNA_struct_property_is_set(op->ptr, "filepath")) {
-		char path[FILE_MAX];
-		RNA_string_get(op->ptr, "filepath", path);
-
-		errno = 0;
-
-		ima = BKE_image_load_exists(path);
-
-		if (!ima) {
-			BKE_reportf(op->reports, RPT_ERROR, "Cannot read image '%s': %s",
-			            path, errno ? strerror(errno) : TIP_("unsupported format"));
-			return OPERATOR_CANCELLED;
-		}
-
-		if (is_relative_path) {
-			Main *bmain = CTX_data_main(C);
-			const char *relbase = ID_BLEND_PATH(bmain, &ima->id);
-			BLI_path_rel(ima->name, relbase);
-		}
-	}
-	else if (RNA_struct_property_is_set(op->ptr, "name")) {
-		char name[MAX_ID_NAME - 2];
-		RNA_string_get(op->ptr, "name", name);
-		ima = (Image *)BKE_libblock_find_name(ID_IM, name);
-
-		if (!ima) {
-			BKE_reportf(op->reports, RPT_ERROR, "Image '%s' not found", name);
-			return OPERATOR_CANCELLED;
-		}
+	ima = (Image *)WM_operator_drop_load_path(C, op, ID_IM);
+	if (!ima) {
+		return OPERATOR_CANCELLED;
 	}
 
 	switch (snode->nodetree->type) {
