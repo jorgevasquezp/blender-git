@@ -601,6 +601,7 @@ void BKE_mesh_loop_islands_init(
 
 	if (mem == NULL) {
 		mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
+		island_store->mem = mem;
 	}
 	/* else memarena should be cleared */
 
@@ -617,8 +618,6 @@ void BKE_mesh_loop_islands_init(
 
 	island_store->innercut_type = innercut_type;
 	island_store->innercuts = BLI_memarena_alloc(mem, sizeof(*island_store->innercuts) * island_store->islands_num_alloc);
-
-	island_store->mem = mem;
 }
 
 void BKE_mesh_loop_islands_clear(MeshIslandStore *island_store)
