@@ -356,7 +356,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 			MPoly *polys_src = dm_src->getPolyArray(dm_src);
 			MLoop *loops_src = dm_src->getLoopArray(dm_src);
 			float (*vcos_src)[3] = MEM_mallocN(sizeof(*vcos_src) * (size_t)dm_src->getNumVerts(dm_src), __func__);
-			int *orig_poly_index_src;
+			int *tessface_to_poly_map_src;
 
 			size_t tmp_buff_size = MREMAP_DEFAULT_BUFSIZE;
 			float (*vcos)[3] = MEM_mallocN(sizeof(*vcos) * tmp_buff_size, __func__);
@@ -366,7 +366,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 			dm_src->getVertCos(dm_src, vcos_src);
 			bvhtree_from_mesh_faces(&treedata, dm_src, (mode & MREMAP_USE_NORPROJ) ? ray_radius : 0.0f, 2, 6);
 			/* bvhtree here uses tesselated faces... */
-			orig_poly_index_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
+			tessface_to_poly_map_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
 
 			if (mode == MREMAP_MODE_VERT_POLYINTERP_VNORPROJ) {
 				for (i = 0; i < numverts_dst; i++) {
@@ -379,7 +379,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 					        &treedata, &rayhit, space_transform,
 					        tmp_co, tmp_no, ray_radius, max_dist, &hit_dist))
 					{
-						MPoly *mp_src = &polys_src[orig_poly_index_src[rayhit.index]];
+						MPoly *mp_src = &polys_src[tessface_to_poly_map_src[rayhit.index]];
 						const int sources_num = mesh_remap_interp_poly_data_get(
 						        mp_src, loops_src, (const float (*)[3])vcos_src, rayhit.co,
 						        &tmp_buff_size, &vcos, false, &indices, &weights, true, NULL);
@@ -405,7 +405,7 @@ void BKE_mesh_remap_calc_verts_from_dm(
 					        &treedata, &nearest, space_transform,
 					        tmp_co, max_dist_sq, &hit_dist))
 					{
-						MPoly *mp = &polys_src[orig_poly_index_src[nearest.index]];
+						MPoly *mp = &polys_src[tessface_to_poly_map_src[nearest.index]];
 
 						if (mode == MREMAP_MODE_VERT_POLY_NEAREST) {
 							int index;
@@ -619,12 +619,12 @@ void BKE_mesh_remap_calc_edges_from_dm(
 			MPoly *polys_src = dm_src->getPolyArray(dm_src);
 			MLoop *loops_src = dm_src->getLoopArray(dm_src);
 			float (*vcos_src)[3] = MEM_mallocN(sizeof(*vcos_src) * (size_t)dm_src->getNumVerts(dm_src), __func__);
-			int *orig_poly_index_src;
+			int *tessface_to_poly_map_src;
 
 			dm_src->getVertCos(dm_src, vcos_src);
 			bvhtree_from_mesh_faces(&treedata, dm_src, 0.0f, 2, 6);
 			/* bvhtree here uses tesselated faces... */
-			orig_poly_index_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
+			tessface_to_poly_map_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
 
 			for (i = 0; i < numedges_dst; i++) {
 				float tmp_co[3];
@@ -635,7 +635,7 @@ void BKE_mesh_remap_calc_edges_from_dm(
 				        &treedata, &nearest, space_transform,
 				        tmp_co, max_dist_sq, &hit_dist))
 				{
-					MPoly *mp_src = &polys_src[orig_poly_index_src[nearest.index]];
+					MPoly *mp_src = &polys_src[tessface_to_poly_map_src[nearest.index]];
 					MLoop *ml_src = &loops_src[mp_src->loopstart];
 					int nloops = mp_src->totloop;
 					float best_dist_sq = FLT_MAX;
@@ -801,14 +801,14 @@ typedef struct AStarPathGraph {
 
 typedef struct AStarPathSolution {
 	/* Final 'most useful' data. */
-	ListBase path;  /* as nodes' indices */
-	int steps;  /* number of steps (i.e. walked links) in path (nodes num, including start and end, is steps + 1). */
+	int steps;  /* Number of steps (i.e. walked links) in path (nodes num, including start and end, is steps + 1). */
+	int *prev_nodes;  /* Store the path, in reversed order (from destination to source node), as indices. */
+	AStarPathLink **prev_links;  /* Indices are nodes' ones, as prev_nodes, but they map to relevant link. */
 
 	void *custom_data;
 
 	/* Mostly runtime data. */
 	BLI_bitmap *done_nodes;
-	int *prev_nodes;
 	float *g_costs;
 	int *g_steps;
 
@@ -870,7 +870,6 @@ static int astar_path_node_link_other_node(AStarPathLink *lnk, const int idx)
 	return (lnk->nodes[0] == idx) ? lnk->nodes[1] : lnk->nodes[0];
 }
 
-
 static void astar_path_solution_init(AStarPathGraph *as_graph, AStarPathSolution *as_solution, void *custom_data)
 {
 	MemArena *mem = as_solution->mem;
@@ -882,15 +881,15 @@ static void astar_path_solution_init(AStarPathGraph *as_graph, AStarPathSolution
 	}
 	/* else memarena should be cleared */
 
-	BLI_listbase_clear(&as_solution->path);
 	as_solution->steps = 0;
+	as_solution->prev_nodes = BLI_memarena_alloc(mem, sizeof(*as_solution->prev_nodes) * node_num);
+	as_solution->prev_links = BLI_memarena_alloc(mem, sizeof(*as_solution->prev_links) * node_num);
+
 	as_solution->custom_data = custom_data;
 
 	as_solution->done_nodes = BLI_BITMAP_NEW_MEMARENA(mem, node_num);
-	as_solution->prev_nodes = BLI_memarena_alloc(mem, sizeof(*as_solution->prev_nodes) * node_num);
 	as_solution->g_costs = BLI_memarena_alloc(mem, sizeof(*as_solution->g_costs) * node_num);
 	as_solution->g_steps = BLI_memarena_alloc(mem, sizeof(*as_solution->g_steps) * node_num);
-
 }
 
 static void astar_path_solution_clear(AStarPathSolution *as_solution)
@@ -899,12 +898,13 @@ static void astar_path_solution_clear(AStarPathSolution *as_solution)
 		BLI_memarena_clear(as_solution->mem);
 	}
 
-	BLI_listbase_clear(&as_solution->path);
 	as_solution->steps = 0;
+	as_solution->prev_nodes = NULL;
+	as_solution->prev_links = NULL;
+
 	as_solution->custom_data = NULL;
 
 	as_solution->done_nodes = NULL;
-	as_solution->prev_nodes = NULL;
 	as_solution->g_costs = NULL;
 	as_solution->g_steps = NULL;
 }
@@ -923,12 +923,13 @@ static bool astar_solve(
 {
 	Heap *todo_nodes;
 
-	MemArena *mem = r_solution->mem;
 	BLI_bitmap *done_nodes = r_solution->done_nodes;
 	int *prev_nodes = r_solution->prev_nodes;
+	AStarPathLink **prev_links = r_solution->prev_links;
 	float *g_costs = r_solution->g_costs;
 	int *g_steps = r_solution->g_steps;
 
+	r_solution->steps = 0;
 	prev_nodes[node_index_src] = -1;
 	BLI_BITMAP_SET_ALL(done_nodes, false, as_graph->node_num);
 	fill_vn_fl(g_costs, as_graph->node_num, FLT_MAX);
@@ -960,18 +961,8 @@ static bool astar_solve(
 		}
 
 		if (node_curr_idx == node_index_dst) {
-			LinkData *steps_data, *sd;
-			int steps = g_steps[node_curr_idx];
-			int i;
-
-			r_solution->steps = steps++;
-			sd = steps_data = BLI_memarena_alloc(mem, sizeof(*steps_data) * ((size_t)steps));
-
-			for (i = node_curr_idx; i != -1; i = prev_nodes[i], sd++, steps--) {
-				sd->data = SET_INT_IN_POINTER(i);
-				BLI_addhead(&r_solution->path, sd);
-			}
-			BLI_assert(steps >= 0);
+			/* Success! Path found... */
+			r_solution->steps = g_steps[node_curr_idx] + 1;
 
 			BLI_heap_free(todo_nodes, NULL);
 			return true;
@@ -988,6 +979,7 @@ static bool astar_solve(
 
 				if (g_cst < g_costs[node_next_idx]) {
 					prev_nodes[node_next_idx] = node_curr_idx;
+					prev_links[node_next_idx] = link;
 					g_costs[node_next_idx] = g_cst;
 					g_steps[node_next_idx] = g_steps[node_curr_idx] + 1;
 					/* We might have this node already in heap, but since this 'instance' will be evaluated first,
@@ -1021,6 +1013,7 @@ static void mesh_island_to_astar_path_graph_edge_process(
 		const int p_idx = edge_to_poly_map[edge_idx].indices[i];
 		MPoly *mp = &polys[p_idx];
 		const int p_isld_idx = islands ? poly_isld_index_map[p_idx] : p_idx;
+		void *custom_data = is_einnercut ? SET_INT_IN_POINTER(edge_idx) : SET_INT_IN_POINTER(-1);
 
 		if (UNLIKELY(islands && (islands->items_to_islands[mp->loopstart] != island_index))) {
 			/* poly not in current island, happens with border edges... */
@@ -1048,7 +1041,7 @@ static void mesh_island_to_astar_path_graph_edge_process(
 				continue;
 			}
 			dist_cost = len_v3v3(poly_centers[p_isld_idx_other], poly_centers[p_isld_idx]);
-			astar_path_node_link_add(as_graph, p_isld_idx_other, p_isld_idx, dist_cost, SET_INT_IN_POINTER(is_einnercut));
+			astar_path_node_link_add(as_graph, p_isld_idx_other, p_isld_idx, dist_cost, custom_data);
 		}
 
 		p_isld_indices[i] = p_isld_idx;
@@ -1136,7 +1129,7 @@ static float mesh_remap_calc_loops_astar_f_cost(
 {
 	float *co_next, *co_dest;
 
-	if (link && GET_INT_FROM_POINTER(link->custom_data)) {
+	if (link && (GET_INT_FROM_POINTER(link->custom_data) != -1)) {
 		/* An innercut edge... We tag our solution as potentially crossing innercuts.
 		 * Note it might not be the case in the end (AStar will explore around optimal path), but helps
 		 * trimming off some processing later... */
@@ -1151,6 +1144,9 @@ static float mesh_remap_calc_loops_astar_f_cost(
 	co_dest = (float *)as_graph->nodes[node_idx_dst].custom_data;
 	return (link ? (as_solution->g_costs[node_idx_curr] + link->cost) : 0.0f) + len_v3v3(co_next, co_dest);
 }
+
+#define ASTAR_STEPS_MAX 6
+
 
 void BKE_mesh_remap_calc_loops_from_dm(
         const int mode, const SpaceTransform *space_transform, const float max_dist, const float ray_radius,
@@ -1188,7 +1184,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		bool use_islands = false;
 
 		AStarPathGraph *as_graphdata = NULL;
-		AStarPathSolution as_solution = {{0}};
+		AStarPathSolution as_solution = {0};
 
 		float (*poly_nors_src)[3] = NULL;
 		float (*loop_nors_src)[3] = NULL;
@@ -1199,9 +1195,14 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		int *vert_to_loop_map_src_buff = NULL;
 		MeshElemMap *vert_to_poly_map_src = NULL;
 		int *vert_to_poly_map_src_buff = NULL;
-		MeshElemMap *edge_to_poly_map = NULL;
-		int *edge_to_poly_map_buff = NULL;
+		MeshElemMap *edge_to_poly_map_src = NULL;
+		int *edge_to_poly_map_src_buff = NULL;
+		MeshElemMap *poly_to_tessface_map_src = NULL;
+		int *poly_to_tessface_map_src_buff = NULL;
+
+		/* Unlike above, those are one-to-one mappings, simpler! */
 		int *loop_to_poly_map_src = NULL;
+		int *tessface_to_poly_map_src = NULL;
 
 		bool verts_allocated_src;
 		MVert *verts_src = DM_get_vert_array(dm_src, &verts_allocated_src);
@@ -1219,8 +1220,6 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		bool faces_allocated_src = false;
 		MFace *faces_src = NULL;
 		int num_faces_src;
-
-		int *orig_poly_index_src = NULL;
 
 		size_t buff_size_interp = MREMAP_DEFAULT_BUFSIZE;
 		float (*vcos_interp)[3] = NULL;
@@ -1297,7 +1296,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		}
 
 		/* Needed for islands (or plain mesh) to AStar graph conversion. */
-		BKE_mesh_edge_poly_map_create(&edge_to_poly_map, &edge_to_poly_map_buff,
+		BKE_mesh_edge_poly_map_create(&edge_to_poly_map_src, &edge_to_poly_map_src_buff,
 		                              edges_src, num_edges_src, polys_src, num_polys_src, loops_src, num_loops_src);
 		if (use_from_vert) {
 			loop_to_poly_map_src = MEM_mallocN(sizeof(*loop_to_poly_map_src) * (size_t)num_loops_src, __func__);
@@ -1347,7 +1346,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		/* Build our AStar graphs. */
 		for (tindex = 0; tindex < num_trees; tindex++) {
 			mesh_island_to_astar_path_graph(
-			        use_islands ? &island_store : NULL, tindex, verts_src, edge_to_poly_map, num_edges_src,
+			        use_islands ? &island_store : NULL, tindex, verts_src, edge_to_poly_map_src, num_edges_src,
 			        loops_src, polys_src, num_polys_src, &as_graphdata[tindex]);
 		}
 
@@ -1398,14 +1397,14 @@ void BKE_mesh_remap_calc_loops_from_dm(
 				}
 				faces_src = DM_get_tessface_array(dm_src, &faces_allocated_src);
 				num_faces_src = dm_src->getNumTessFaces(dm_src);
-				orig_poly_index_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
+				tessface_to_poly_map_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
 				faces_active = BLI_BITMAP_NEW((size_t)num_faces_src, __func__);
 
 				for (tindex = 0; tindex < num_trees; tindex++) {
 					int num_faces_active = 0;
 					BLI_BITMAP_SET_ALL(faces_active, false, (size_t)num_faces_src);
 					for (i = 0; i < num_faces_src; i++) {
-						MPoly *mp_src = &polys_src[orig_poly_index_src[i]];
+						MPoly *mp_src = &polys_src[tessface_to_poly_map_src[i]];
 						if (island_store.items_to_islands[mp_src->loopstart] == tindex) {
 							BLI_BITMAP_ENABLE(faces_active, i);
 							num_faces_active++;
@@ -1429,7 +1428,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			else {
 				BLI_assert(num_trees == 1);
 				bvhtree_from_mesh_faces(&treedata[0], dm_src, bvh_epsilon, 2, 6);
-				orig_poly_index_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
+				tessface_to_poly_map_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
 			}
 		}
 
@@ -1536,7 +1535,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							{
 								islands_res[tindex][plidx_dst].factor = (hit_dist ? (1.0f / hit_dist) : 1e18f) * w;
 								islands_res[tindex][plidx_dst].hit_dist = hit_dist;
-								islands_res[tindex][plidx_dst].index_src = orig_poly_index_src[rayhit.index];
+								islands_res[tindex][plidx_dst].index_src = tessface_to_poly_map_src[rayhit.index];
 								copy_v3_v3(islands_res[tindex][plidx_dst].hit_point, rayhit.co);
 								break;
 							}
@@ -1563,7 +1562,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							        tmp_co, max_dist_sq, &hit_dist))
 							{
 								islands_res[tindex][plidx_dst].hit_dist = hit_dist;
-								islands_res[tindex][plidx_dst].index_src = orig_poly_index_src[nearest.index];
+								islands_res[tindex][plidx_dst].index_src = tessface_to_poly_map_src[nearest.index];
 								copy_v3_v3(islands_res[tindex][plidx_dst].hit_point, nearest.co);
 							}
 							else {
@@ -1585,7 +1584,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						{
 							islands_res[tindex][plidx_dst].factor = hit_dist ? (1.0f / hit_dist) : 1e18f;
 							islands_res[tindex][plidx_dst].hit_dist = hit_dist;
-							islands_res[tindex][plidx_dst].index_src = orig_poly_index_src[nearest.index];
+							islands_res[tindex][plidx_dst].index_src = tessface_to_poly_map_src[nearest.index];
 							copy_v3_v3(islands_res[tindex][plidx_dst].hit_point, nearest.co);
 						}
 						else {
@@ -1602,7 +1601,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			{
 				AStarPathGraph *as_graph = NULL;
 				int *poly_isld_index_map = NULL;
-				int pidx_src_org, pidx_src_prev = -1;
+				int pidx_src_prev = -1;
 
 				float best_island_fac = 0.0f;
 				int best_island_index = -1;
@@ -1645,14 +1644,11 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						lidx_src = isld_res->index_src;
 						if (lidx_src >= 0) {
 							pidx_src = loop_to_poly_map_src[lidx_src];
-							if (pidx_src_prev == -1) {
-								pidx_src_org = pidx_src;
-							}
 							/* If prev and curr poly are the same, no need to do anything more!!! */
-							else if (pidx_src_prev != pidx_src) {
+							if (!ELEM(pidx_src_prev, -1, pidx_src)) {
 								astar_solve(as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
-								            mesh_remap_calc_loops_astar_f_cost, &as_solution, 4);
-								if (GET_INT_FROM_POINTER(as_solution.custom_data)) {
+								            mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
+								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
 									 * before that edge.
 									 * Note we could try to be much smarter (like e.g. storing a whole poly's indices,
@@ -1660,7 +1656,45 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									 * but this is one more level of complexity, better to first see if
 									 * simple solution works!
 									 */
-									//printf("%d, %d\n", as_solution.steps, GET_INT_FROM_POINTER(as_solution.custom_data));
+									int pisld_idx_src = poly_isld_index_map[pidx_src];
+									int last_valid_pisld_idx_src = -1;
+									/* Note we go backward here, from dest to src poly. */
+									for (i = as_solution.steps - 1; i--;) {
+										AStarPathLink *as_link = as_solution.prev_links[pisld_idx_src];
+										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
+										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
+										BLI_assert(pisld_idx_src != -1);
+										if (eidx != -1) {
+											/* we are 'crossing' a cutting edge. */
+											last_valid_pisld_idx_src = pisld_idx_src;
+										}
+									}
+									if (last_valid_pisld_idx_src != -1) {
+										/* Find a new valid loop in that new poly (nearest one for now).
+										 * Note we could be much more subtle here, that's for later... */
+										MPoly *mp_src;
+										MLoop *ml_src, *ml_dst = &loops_dst[lidx_dst];
+										int j;
+										float best_dist_sq = FLT_MAX;
+										float tmp_co[3];
+
+										copy_v3_v3(tmp_co, verts_dst[ml_dst->v].co);
+
+										/* We do our transform here, since we may do several raycast/nearest queries. */
+										if (space_transform) {
+											BLI_space_transform_apply(space_transform, tmp_co);
+										}
+
+										pidx_src = island_store.islands[best_island_index]->indices[last_valid_pisld_idx_src];
+										mp_src = &polys_src[pidx_src];
+										for (j = 0, ml_src = &loops_src[mp_src->loopstart]; j < mp_src->totloop; j++, ml_src++) {
+											const float dist = len_squared_v3v3(verts_src[ml_src->v].co, tmp_co);
+											if (dist < best_dist_sq) {
+												best_dist_sq = dist;
+												lidx_src = mp_src->loopstart + j;
+											}
+										}
+									}
 								}
 							}
 							mesh_remap_item_define(
@@ -1684,14 +1718,11 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							float *hit_co = isld_res->hit_point;
 							int best_loop_index_src;
 
-							if (pidx_src_prev == -1) {
-								pidx_src_org = pidx_src;
-							}
 							/* If prev and curr poly are the same, no need to do anything more!!! */
-							else if (pidx_src_prev != pidx_src) {
+							if (!ELEM(pidx_src_prev, -1, pidx_src)) {
 								astar_solve(as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
-								            mesh_remap_calc_loops_astar_f_cost, &as_solution, 4);
-								if (GET_INT_FROM_POINTER(as_solution.custom_data)) {
+								            mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
+								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
 									 * before that edge.
 									 * Note we could try to be much smarter (like e.g. storing a whole poly's indices,
@@ -1699,7 +1730,64 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									 * but this is one more level of complexity, better to first see if
 									 * simple solution works!
 									 */
-									//printf("%d, %d\n", as_solution.steps, GET_INT_FROM_POINTER(as_solution.custom_data));
+									int pisld_idx_src = poly_isld_index_map[pidx_src];
+									int last_valid_pisld_idx_src = -1;
+									/* Note we go backward here, from dest to src poly. */
+									for (i = as_solution.steps - 1; i--;) {
+										AStarPathLink *as_link = as_solution.prev_links[pisld_idx_src];
+										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
+										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
+										BLI_assert(pisld_idx_src != -1);
+										if (eidx != -1) {
+											/* we are 'crossing' a cutting edge. */
+											last_valid_pisld_idx_src = pisld_idx_src;
+										}
+									}
+									if (last_valid_pisld_idx_src != -1) {
+										/* Find a new valid loop in that new poly (nearest point on poly for now).
+										 * Note we could be much more subtle here, that's for later... */
+										MLoop *ml_dst = &loops_dst[lidx_dst];
+										float best_dist_sq = FLT_MAX;
+										float tmp_co[3];
+										int j;
+
+										copy_v3_v3(tmp_co, verts_dst[ml_dst->v].co);
+
+										/* We do our transform here, since we may do several raycast/nearest queries. */
+										if (space_transform) {
+											BLI_space_transform_apply(space_transform, tmp_co);
+										}
+
+										pidx_src = island_store.islands[best_island_index]->indices[last_valid_pisld_idx_src];
+										mp_src = &polys_src[pidx_src];
+
+										if (poly_to_tessface_map_src == NULL) {
+											BKE_mesh_origindex_map_create(
+											        &poly_to_tessface_map_src, &poly_to_tessface_map_src_buff,
+											        num_faces_src, tessface_to_poly_map_src, num_polys_src);
+										}
+
+										for (j = poly_to_tessface_map_src[pidx_src].count; j--;) {
+											float h[3];
+											MFace *mf = &faces_src[poly_to_tessface_map_src[pidx_src].indices[j]];
+											float dist_sq;
+
+											closest_on_tri_to_point_v3(h, tmp_co, verts_src[mf->v1].co, verts_src[mf->v2].co, verts_src[mf->v3].co);
+											dist_sq = len_squared_v3v3(tmp_co, h);
+											if (dist_sq < best_dist_sq) {
+												copy_v3_v3(hit_co, h);
+												best_dist_sq = dist_sq;
+											}
+											if (mf->v4) {
+												closest_on_tri_to_point_v3(h, tmp_co, verts_src[mf->v1].co, verts_src[mf->v3].co, verts_src[mf->v4].co);
+												dist_sq = len_squared_v3v3(tmp_co, h);
+												if (dist_sq < best_dist_sq) {
+													copy_v3_v3(hit_co, h);
+													best_dist_sq = dist_sq;
+												}
+											}
+										}
+									}
 								}
 							}
 
@@ -1774,8 +1862,11 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		if (vert_to_poly_map_src_buff) {
 			MEM_freeN(vert_to_poly_map_src_buff);
 		}
-		if (edge_to_poly_map_buff) {
-			MEM_freeN(edge_to_poly_map_buff);
+		if (edge_to_poly_map_src_buff) {
+			MEM_freeN(edge_to_poly_map_src_buff);
+		}
+		if (poly_to_tessface_map_src_buff) {
+			MEM_freeN(poly_to_tessface_map_src_buff);
 		}
 		if (loop_to_poly_map_src) {
 			MEM_freeN(loop_to_poly_map_src);
@@ -1832,14 +1923,14 @@ void BKE_mesh_remap_calc_polys_from_dm(
 		BVHTreeRayHit rayhit = {0};
 		float hit_dist;
 
-		int *orig_poly_index_src;
+		int *tessface_to_poly_map_src;
 
 		bvhtree_from_mesh_faces(
 		        &treedata, dm_src,
 		        (mode & MREMAP_USE_NORPROJ) ? MREMAP_RAYCAST_APPROXIMATE_BVHEPSILON(ray_radius) : 0.0f,
 		        2, 6);
 		/* bvhtree here uses tesselated faces... */
-		orig_poly_index_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
+		tessface_to_poly_map_src = dm_src->getTessFaceDataArray(dm_src, CD_ORIGINDEX);
 
 		if (mode == MREMAP_MODE_POLY_NEAREST) {
 			nearest.index = -1;
@@ -1856,7 +1947,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 				{
 					mesh_remap_item_define(
 					        r_map, i, hit_dist, 0,
-					        1, &orig_poly_index_src[nearest.index], &full_weight);
+					        1, &tessface_to_poly_map_src[nearest.index], &full_weight);
 				}
 				else {
 					/* No source for this dest poly! */
@@ -1880,7 +1971,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 				{
 					mesh_remap_item_define(
 					        r_map, i, hit_dist, 0,
-					        1, &orig_poly_index_src[rayhit.index], &full_weight);
+					        1, &tessface_to_poly_map_src[rayhit.index], &full_weight);
 				}
 				else {
 					/* No source for this dest poly! */
@@ -2026,7 +2117,7 @@ void BKE_mesh_remap_calc_polys_from_dm(
 							        &treedata, &rayhit, NULL,
 							        tmp_co, tmp_no, ray_radius / w, max_dist, &hit_dist))
 							{
-								weights[orig_poly_index_src[rayhit.index]] += w;
+								weights[tessface_to_poly_map_src[rayhit.index]] += w;
 								totweights += w;
 								hit_dist_accum += hit_dist;
 								break;
