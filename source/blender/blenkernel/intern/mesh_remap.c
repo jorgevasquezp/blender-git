@@ -917,7 +917,7 @@ static void astar_path_solution_free(AStarPathSolution *as_solution)
 	}
 }
 
-static bool astar_solve(
+static bool astar_path_solve(
         AStarPathGraph *as_graph, const int node_index_src, const int node_index_dst, astar_f_cost f_cost_cb,
         AStarPathSolution *r_solution, const int max_steps)
 {
@@ -1219,7 +1219,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		const int num_polys_src = dm_src->getNumPolys(dm_src);
 		bool faces_allocated_src = false;
 		MFace *faces_src = NULL;
-		int num_faces_src;
+		int num_faces_src = 0;
 
 		size_t buff_size_interp = MREMAP_DEFAULT_BUFSIZE;
 		float (*vcos_interp)[3] = NULL;
@@ -1598,6 +1598,15 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			}
 
 			/* And now, find best island to use! */
+			/* We have to first select the 'best source island' for given dst poly and its loops.
+			 * Then, we have to check that poly does not 'spread' across some island's limits
+			 * (like inner seams for UVs, etc.).
+			 * Note we only still partially support that kind of situation here, i.e. polys spreading over actual cracks
+			 * (like a narrow space without faces on src, splitting a 'tube-like' geometry). That kind of situation
+			 * should be relatively rare, though.
+			 */
+			/* XXX This block in itself is big and complex enough to be a separate function but... it uses a bunch
+			 *     of locale vars. Not worth sending all that through parameters (for now at least). */
 			{
 				AStarPathGraph *as_graph = NULL;
 				int *poly_isld_index_map = NULL;
@@ -1646,13 +1655,14 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							pidx_src = loop_to_poly_map_src[lidx_src];
 							/* If prev and curr poly are the same, no need to do anything more!!! */
 							if (!ELEM(pidx_src_prev, -1, pidx_src)) {
-								astar_solve(as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
-								            mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
+								astar_path_solve(
+								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
+								        mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
 									 * before that edge.
 									 * Note we could try to be much smarter (like e.g. storing a whole poly's indices,
-									 * and making decision (one which side of cutting edge(s!) to be on the end,
+									 * and making decision (on which side of cutting edge(s!) to be) on the end,
 									 * but this is one more level of complexity, better to first see if
 									 * simple solution works!
 									 */
@@ -1671,7 +1681,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									}
 									if (last_valid_pisld_idx_src != -1) {
 										/* Find a new valid loop in that new poly (nearest one for now).
-										 * Note we could be much more subtle here, that's for later... */
+										 * Note we could be much more subtle here, again that's for later... */
 										MPoly *mp_src;
 										MLoop *ml_src, *ml_dst = &loops_dst[lidx_dst];
 										int j;
@@ -1687,10 +1697,11 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 										pidx_src = island_store.islands[best_island_index]->indices[last_valid_pisld_idx_src];
 										mp_src = &polys_src[pidx_src];
-										for (j = 0, ml_src = &loops_src[mp_src->loopstart]; j < mp_src->totloop; j++, ml_src++) {
-											const float dist = len_squared_v3v3(verts_src[ml_src->v].co, tmp_co);
-											if (dist < best_dist_sq) {
-												best_dist_sq = dist;
+										ml_src = &loops_src[mp_src->loopstart];
+										for (j = 0; j < mp_src->totloop; j++, ml_src++) {
+											const float dist_sq = len_squared_v3v3(verts_src[ml_src->v].co, tmp_co);
+											if (dist_sq < best_dist_sq) {
+												best_dist_sq = dist_sq;
 												lidx_src = mp_src->loopstart + j;
 											}
 										}
@@ -1720,8 +1731,9 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 							/* If prev and curr poly are the same, no need to do anything more!!! */
 							if (!ELEM(pidx_src_prev, -1, pidx_src)) {
-								astar_solve(as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
-								            mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
+								astar_path_solve(
+								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
+								        mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
 									 * before that edge.
@@ -1736,6 +1748,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									for (i = as_solution.steps - 1; i--;) {
 										AStarPathLink *as_link = as_solution.prev_links[pisld_idx_src];
 										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
+
 										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
 										BLI_assert(pisld_idx_src != -1);
 										if (eidx != -1) {
@@ -1745,7 +1758,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									}
 									if (last_valid_pisld_idx_src != -1) {
 										/* Find a new valid loop in that new poly (nearest point on poly for now).
-										 * Note we could be much more subtle here, that's for later... */
+										 * Note we could be much more subtle here, again that's for later... */
 										MLoop *ml_dst = &loops_dst[lidx_dst];
 										float best_dist_sq = FLT_MAX;
 										float tmp_co[3];
@@ -1772,14 +1785,18 @@ void BKE_mesh_remap_calc_loops_from_dm(
 											MFace *mf = &faces_src[poly_to_tessface_map_src[pidx_src].indices[j]];
 											float dist_sq;
 
-											closest_on_tri_to_point_v3(h, tmp_co, verts_src[mf->v1].co, verts_src[mf->v2].co, verts_src[mf->v3].co);
+											closest_on_tri_to_point_v3(
+											        h, tmp_co,
+											        vcos_src[mf->v1], vcos_src[mf->v2], vcos_src[mf->v3]);
 											dist_sq = len_squared_v3v3(tmp_co, h);
 											if (dist_sq < best_dist_sq) {
 												copy_v3_v3(hit_co, h);
 												best_dist_sq = dist_sq;
 											}
 											if (mf->v4) {
-												closest_on_tri_to_point_v3(h, tmp_co, verts_src[mf->v1].co, verts_src[mf->v3].co, verts_src[mf->v4].co);
+												closest_on_tri_to_point_v3(
+												        h, tmp_co,
+												        vcos_src[mf->v1], vcos_src[mf->v3], vcos_src[mf->v4]);
 												dist_sq = len_squared_v3v3(tmp_co, h);
 												if (dist_sq < best_dist_sq) {
 													copy_v3_v3(hit_co, h);
