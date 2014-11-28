@@ -931,6 +931,7 @@ bool BKE_object_data_transfer_dm(
         Scene *scene, Object *ob_src, Object *ob_dst, DerivedMesh *dm_dst, const int data_types, bool use_create,
         const int map_vert_mode, const int map_edge_mode, const int map_loop_mode, const int map_poly_mode,
         SpaceTransform *space_transform, const float max_distance, const float ray_radius,
+        const float islands_handling_precision,
         const int fromlayers_select[DT_MULTILAYER_INDEX_MAX], const int tolayers_select[DT_MULTILAYER_INDEX_MAX],
         const int mix_mode, const float mix_factor, const char *vgroup_name, const bool invert_vgroup,
         ReportList *reports)
@@ -1119,7 +1120,7 @@ bool BKE_object_data_transfer_dm(
 				        verts_dst, num_verts_dst, edges_dst, num_edges_dst,
 				        loops_dst, num_loops_dst, polys_dst, num_polys_dst,
 				        ldata_dst, pdata_dst, me_dst->smoothresh, dirty_nors_dst,
-				        dm_src, island_callback, &geom_map[LDATA]);
+				        dm_src, island_callback, islands_handling_precision, &geom_map[LDATA]);
 				geom_map_init[LDATA] = true;
 			}
 
@@ -1213,6 +1214,7 @@ bool BKE_object_data_transfer_mesh(
         Scene *scene, Object *ob_src, Object *ob_dst, const int data_types, const bool use_create,
         const int map_vert_mode, const int map_edge_mode, const int map_loop_mode, const int map_poly_mode,
         SpaceTransform *space_transform, const float max_distance, const float ray_radius,
+        const float islands_handling_precision,
         const int fromlayers_select[DT_MULTILAYER_INDEX_MAX], const int tolayers_select[DT_MULTILAYER_INDEX_MAX],
         const int mix_mode, const float mix_factor, const char *vgroup_name, const bool invert_vgroup,
         ReportList *reports)
@@ -1220,6 +1222,6 @@ bool BKE_object_data_transfer_mesh(
 	return BKE_object_data_transfer_dm(
 	        scene, ob_src, ob_dst, NULL, data_types, use_create,
 	        map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode, space_transform,
-	        max_distance, ray_radius, fromlayers_select, tolayers_select,
+	        max_distance, ray_radius, islands_handling_precision, fromlayers_select, tolayers_select,
 	        mix_mode, mix_factor, vgroup_name, invert_vgroup, reports);
 }

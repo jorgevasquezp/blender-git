@@ -1145,7 +1145,7 @@ static float mesh_remap_calc_loops_astar_f_cost(
 	return (link ? (as_solution->g_costs[node_idx_curr] + link->cost) : 0.0f) + len_v3v3(co_next, co_dest);
 }
 
-#define ASTAR_STEPS_MAX 6
+#define ASTAR_STEPS_MAX 64
 
 
 void BKE_mesh_remap_calc_loops_from_dm(
@@ -1153,14 +1153,17 @@ void BKE_mesh_remap_calc_loops_from_dm(
         MVert *verts_dst, const int numverts_dst, MEdge *edges_dst, const int numedges_dst,
         MLoop *loops_dst, const int numloops_dst, MPoly *polys_dst, const int numpolys_dst,
         CustomData *ldata_dst, CustomData *pdata_dst, const float split_angle_dst, const bool dirty_nors_dst,
-        DerivedMesh *dm_src, MeshRemapIslandsCalc gen_islands_src, MeshPairRemap *r_map)
+        DerivedMesh *dm_src,
+        MeshRemapIslandsCalc gen_islands_src, const float islands_precision_src, MeshPairRemap *r_map)
 {
 	const float full_weight = 1.0f;
 	const float max_dist_sq = max_dist * max_dist;
+	const int isld_steps_src = (int)(ASTAR_STEPS_MAX * islands_precision_src + 0.499f);
 
 	int i;
 
 	BLI_assert(mode & MREMAP_MODE_LOOP);
+	BLI_assert((islands_precision_src >= 0.0f) && (islands_precision_src <= 1.0f));
 
 	BKE_mesh_remap_init(r_map, numloops_dst);
 
@@ -1326,7 +1329,9 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 			num_trees = use_islands ? island_store.islands_num : 1;
 			treedata = MEM_callocN(sizeof(*treedata) * (size_t)num_trees, __func__);
-			as_graphdata = MEM_callocN(sizeof(*as_graphdata) * (size_t)num_trees, __func__);
+			if (isld_steps_src) {
+				as_graphdata = MEM_callocN(sizeof(*as_graphdata) * (size_t)num_trees, __func__);
+			}
 
 			if (use_islands) {
 				/* We expect our islands to contain poly indices, with edge indices of 'inner cuts',
@@ -1340,14 +1345,18 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		else {
 			num_trees = 1;
 			treedata = MEM_callocN(sizeof(*treedata), __func__);
-			as_graphdata = MEM_callocN(sizeof(*as_graphdata), __func__);
+			if (isld_steps_src) {
+				as_graphdata = MEM_callocN(sizeof(*as_graphdata), __func__);
+			}
 		}
 
 		/* Build our AStar graphs. */
-		for (tindex = 0; tindex < num_trees; tindex++) {
-			mesh_island_to_astar_path_graph(
-			        use_islands ? &island_store : NULL, tindex, verts_src, edge_to_poly_map_src, num_edges_src,
-			        loops_src, polys_src, num_polys_src, &as_graphdata[tindex]);
+		if (isld_steps_src) {
+			for (tindex = 0; tindex < num_trees; tindex++) {
+				mesh_island_to_astar_path_graph(
+				        use_islands ? &island_store : NULL, tindex, verts_src, edge_to_poly_map_src, num_edges_src,
+				        loops_src, polys_src, num_polys_src, &as_graphdata[tindex]);
+			}
 		}
 
 		/* Build our BVHtrees, either from verts or tessfaces. */
@@ -1629,7 +1638,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 					}
 				}
 
-				if (best_island_index != -1) {
+				if (best_island_index != -1 && isld_steps_src) {
 					as_graph = &as_graphdata[best_island_index];
 					poly_isld_index_map = (int *)as_graph->custom_data;
 					astar_path_solution_init(as_graph, &as_solution, false);
@@ -1654,10 +1663,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 						if (lidx_src >= 0) {
 							pidx_src = loop_to_poly_map_src[lidx_src];
 							/* If prev and curr poly are the same, no need to do anything more!!! */
-							if (!ELEM(pidx_src_prev, -1, pidx_src)) {
+							if (!ELEM(pidx_src_prev, -1, pidx_src) && isld_steps_src) {
 								astar_path_solve(
 								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
-								        mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
+								        mesh_remap_calc_loops_astar_f_cost, &as_solution, isld_steps_src);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
 									 * before that edge.
@@ -1730,10 +1739,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							int best_loop_index_src;
 
 							/* If prev and curr poly are the same, no need to do anything more!!! */
-							if (!ELEM(pidx_src_prev, -1, pidx_src)) {
+							if (!ELEM(pidx_src_prev, -1, pidx_src) && isld_steps_src) {
 								astar_path_solve(
 								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
-								        mesh_remap_calc_loops_astar_f_cost, &as_solution, ASTAR_STEPS_MAX);
+								        mesh_remap_calc_loops_astar_f_cost, &as_solution, isld_steps_src);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
 									 * before that edge.
@@ -1847,13 +1856,17 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		for (tindex = 0; tindex < num_trees; tindex++) {
 			MEM_freeN(islands_res[tindex]);
 			free_bvhtree_from_mesh(&treedata[tindex]);
-			astar_path_graph_free(&as_graphdata[tindex]);
+			if (isld_steps_src) {
+				astar_path_graph_free(&as_graphdata[tindex]);
+			}
 		}
 		MEM_freeN(islands_res);
 		BKE_mesh_loop_islands_free(&island_store);
 		MEM_freeN(treedata);
-		MEM_freeN(as_graphdata);
-		astar_path_solution_free(&as_solution);
+		if (isld_steps_src) {
+			MEM_freeN(as_graphdata);
+			astar_path_solution_free(&as_solution);
+		}
 
 		if (verts_allocated_src) {
 			MEM_freeN(verts_src);

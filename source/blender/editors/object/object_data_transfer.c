@@ -332,6 +332,7 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 	const bool use_max_distance = RNA_boolean_get(op->ptr, "use_max_distance");
 	const float max_distance = use_max_distance ? RNA_float_get(op->ptr, "max_distance") : FLT_MAX;
 	const float ray_radius = RNA_float_get(op->ptr, "ray_radius");
+	const float islands_precision = RNA_float_get(op->ptr, "islands_precision");
 
 	const int layers_src = RNA_enum_get(op->ptr, "layers_select_src");
 	const int layers_dst = RNA_enum_get(op->ptr, "layers_select_dst");
@@ -362,7 +363,8 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 			if (BKE_object_data_transfer_mesh(
 			        scene, ob_src, ob_dst, data_type, use_create,
 			        map_vert_mode, map_edge_mode, map_loop_mode, map_poly_mode,
-			        space_transform, max_distance, ray_radius, layers_select_src, layers_select_dst,
+			        space_transform, max_distance, ray_radius, islands_precision,
+			        layers_select_src, layers_select_dst,
 			        mix_mode, mix_factor, NULL, false, op->reports))
 			{
 				changed = true;
@@ -415,6 +417,9 @@ static bool data_transfer_draw_check_prop(PointerRNA *ptr, PropertyRNA *prop)
 	}
 
 	if (STREQ(prop_id, "max_distance") && !use_max_distance) {
+		return false;
+	}
+	if (STREQ(prop_id, "islands_precision") && !DT_DATATYPE_IS_LOOP(data_type)) {
 		return false;
 	}
 
@@ -502,6 +507,10 @@ void OBJECT_OT_data_transfer(wmOperatorType *ot)
 	                     "'Width' of rays (especially useful when raycasting against vertices or edges)",
 	                     0.0f, 10.0f);
 	RNA_def_property_subtype(prop, PROP_DISTANCE);
+	prop = RNA_def_float(ot->srna, "islands_precision", 0.1f, 0.0f, 1.0f, "Islands Precision",
+	                     "Factor controlling precision of islands handling (the higher, the better the results)",
+	                     0.0f, 1.0f);
+	RNA_def_property_subtype(prop, PROP_FACTOR);
 
 	/* How to handle multi-layers types of data. */
 	prop = RNA_def_enum(ot->srna, "layers_select_src", DT_layers_select_src_items, DT_LAYERS_ACTIVE_SRC,
