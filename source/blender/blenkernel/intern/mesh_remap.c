@@ -783,48 +783,48 @@ void BKE_mesh_remap_calc_edges_from_dm(
 static void mesh_island_to_astar_graph_edge_process(
         MeshIslandStore *islands, const int island_index, BLI_AStarGraph *as_graph,
         MVert *verts, MPoly *polys, MLoop *loops,
-        const int edge_idx, BLI_bitmap *done_edges, MeshElemMap *edge_to_poly_map, const bool is_einnercut,
-        int *poly_isld_index_map, float (*poly_centers)[3], unsigned char *poly_status)
+        const int edge_idx, BLI_bitmap *done_edges, MeshElemMap *edge_to_poly_map, const bool is_edge_innercut,
+        int *poly_island_index_map, float (*poly_centers)[3], unsigned char *poly_status)
 {
-	int *p_isld_indices = BLI_array_alloca(p_isld_indices, (size_t)edge_to_poly_map[edge_idx].count);
+	int *poly_island_indices = BLI_array_alloca(poly_island_indices, (size_t)edge_to_poly_map[edge_idx].count);
 	int i, j;
 
 	for (i = 0; i < edge_to_poly_map[edge_idx].count; i++) {
-		const int p_idx = edge_to_poly_map[edge_idx].indices[i];
-		MPoly *mp = &polys[p_idx];
-		const int p_isld_idx = islands ? poly_isld_index_map[p_idx] : p_idx;
-		void *custom_data = is_einnercut ? SET_INT_IN_POINTER(edge_idx) : SET_INT_IN_POINTER(-1);
+		const int pidx = edge_to_poly_map[edge_idx].indices[i];
+		MPoly *mp = &polys[pidx];
+		const int pidx_isld = islands ? poly_island_index_map[pidx] : pidx;
+		void *custom_data = is_edge_innercut ? SET_INT_IN_POINTER(edge_idx) : SET_INT_IN_POINTER(-1);
 
 		if (UNLIKELY(islands && (islands->items_to_islands[mp->loopstart] != island_index))) {
 			/* poly not in current island, happens with border edges... */
-			p_isld_indices[i] = -1;
+			poly_island_indices[i] = -1;
 			continue;
 		}
 
-		if (poly_status[p_isld_idx] == POLY_COMPLETE) {
-			p_isld_indices[i] = p_isld_idx;
+		if (poly_status[pidx_isld] == POLY_COMPLETE) {
+			poly_island_indices[i] = pidx_isld;
 			continue;
 		}
 
-		if (poly_status[p_isld_idx] == POLY_UNSET) {
-			BKE_mesh_calc_poly_center(mp, &loops[mp->loopstart], verts, poly_centers[p_isld_idx]);
-			BLI_astar_node_init(as_graph, p_isld_idx, poly_centers[p_isld_idx]);
-			poly_status[p_isld_idx] = POLY_CENTER_INIT;
+		if (poly_status[pidx_isld] == POLY_UNSET) {
+			BKE_mesh_calc_poly_center(mp, &loops[mp->loopstart], verts, poly_centers[pidx_isld]);
+			BLI_astar_node_init(as_graph, pidx_isld, poly_centers[pidx_isld]);
+			poly_status[pidx_isld] = POLY_CENTER_INIT;
 		}
 
 		for (j = i; j--;) {
 			float dist_cost;
-			const int p_isld_idx_other = p_isld_indices[j];
+			const int pidx_isld_other = poly_island_indices[j];
 
-			if (p_isld_idx_other == -1 || poly_status[p_isld_idx_other] == POLY_COMPLETE) {
+			if (pidx_isld_other == -1 || poly_status[pidx_isld_other] == POLY_COMPLETE) {
 				/* If the other poly is complete, that link has already been added! */
 				continue;
 			}
-			dist_cost = len_v3v3(poly_centers[p_isld_idx_other], poly_centers[p_isld_idx]);
-			BLI_astar_node_link_add(as_graph, p_isld_idx_other, p_isld_idx, dist_cost, custom_data);
+			dist_cost = len_v3v3(poly_centers[pidx_isld_other], poly_centers[pidx_isld]);
+			BLI_astar_node_link_add(as_graph, pidx_isld_other, pidx_isld, dist_cost, custom_data);
 		}
 
-		p_isld_indices[i] = p_isld_idx;
+		poly_island_indices[i] = pidx_isld;
 	}
 
 	BLI_BITMAP_ENABLE(done_edges, edge_idx);
@@ -838,14 +838,14 @@ static void mesh_island_to_astar_graph(
 	MeshElemMap *island_poly_map = islands ? islands->islands[island_index] : NULL;
 	MeshElemMap *island_einnercut_map = islands ? islands->innercuts[island_index] : NULL;
 
-	int *poly_isld_index_map = NULL;
+	int *poly_island_index_map = NULL;
 	BLI_bitmap *done_edges = BLI_BITMAP_NEW(numedges, __func__);
 
 	const int node_num = islands ? island_poly_map->count : numpolys;
 	unsigned char *poly_status = MEM_callocN(sizeof(*poly_status) * (size_t)node_num, __func__);
 	float (*poly_centers)[3];
 
-	int p_isld_idx;
+	int pidx_isld;
 	int i;
 
 	BLI_astar_graph_init(r_as_graph, node_num, NULL);
@@ -853,28 +853,28 @@ static void mesh_island_to_astar_graph(
 	poly_centers = BLI_memarena_calloc(r_as_graph->mem, sizeof(*poly_centers) * (size_t)node_num);
 
 	if (islands) {
-		/* poly_isld_index_map is owned by graph memarena. */
-		poly_isld_index_map = BLI_memarena_calloc(r_as_graph->mem, sizeof(*poly_isld_index_map) * (size_t)numpolys);
+		/* poly_island_index_map is owned by graph memarena. */
+		poly_island_index_map = BLI_memarena_calloc(r_as_graph->mem, sizeof(*poly_island_index_map) * (size_t)numpolys);
 		for (i = island_poly_map->count; i--;) {
-			poly_isld_index_map[island_poly_map->indices[i]] = i;
+			poly_island_index_map[island_poly_map->indices[i]] = i;
 		}
 
-		r_as_graph->custom_data = poly_isld_index_map;
+		r_as_graph->custom_data = poly_island_index_map;
 
 		for (i = island_einnercut_map->count; i--;) {
 			mesh_island_to_astar_graph_edge_process(
 			        islands, island_index, r_as_graph, verts, polys, loops,
 			        island_einnercut_map->indices[i], done_edges, edge_to_poly_map, true,
-			        poly_isld_index_map, poly_centers, poly_status);
+			        poly_island_index_map, poly_centers, poly_status);
 		}
 	}
 
-	for (p_isld_idx = node_num; p_isld_idx--;) {
-		const int p_idx = islands ? island_poly_map->indices[p_isld_idx] : p_isld_idx;
-		MPoly *mp = &polys[p_idx];
+	for (pidx_isld = node_num; pidx_isld--;) {
+		const int pidx = islands ? island_poly_map->indices[pidx_isld] : pidx_isld;
+		MPoly *mp = &polys[pidx];
 		int pl_idx, l_idx;
 
-		if (poly_status[p_isld_idx] == POLY_COMPLETE) {
+		if (poly_status[pidx_isld] == POLY_COMPLETE) {
 			continue;
 		}
 
@@ -888,9 +888,9 @@ static void mesh_island_to_astar_graph(
 			mesh_island_to_astar_graph_edge_process(
 			        islands, island_index, r_as_graph, verts, polys, loops,
 			        (int)ml->e, done_edges, edge_to_poly_map, false,
-			        poly_isld_index_map, poly_centers, poly_status);
+			        poly_island_index_map, poly_centers, poly_status);
 		}
-		poly_status[p_isld_idx] = POLY_COMPLETE;
+		poly_status[pidx_isld] = POLY_COMPLETE;
 	}
 
 	MEM_freeN(done_edges);
@@ -919,7 +919,8 @@ static float mesh_remap_calc_loops_astar_f_cost(
 	}
 
 	/* Our heuristic part of current f_cost is distance from next node to destination one.
-	 * It is guaranteed to be less than actual shortest poly-path between next node and destination one. */
+	 * It is guaranteed to be less than (or equal to) actual shortest poly-path between next node and destination one.
+	 */
 	co_next = (float *)as_graph->nodes[node_idx_next].custom_data;
 	co_dest = (float *)as_graph->nodes[node_idx_dst].custom_data;
 	return (link ? (as_solution->g_costs[node_idx_curr] + link->cost) : 0.0f) + len_v3v3(co_next, co_dest);
@@ -938,7 +939,6 @@ void BKE_mesh_remap_calc_loops_from_dm(
 {
 	const float full_weight = 1.0f;
 	const float max_dist_sq = max_dist * max_dist;
-	const int isld_steps_src = (int)(ASTAR_STEPS_MAX * islands_precision_src + 0.499f);
 
 	int i;
 
@@ -968,6 +968,8 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 		BLI_AStarGraph *as_graphdata = NULL;
 		BLI_AStarSolution as_solution = {0};
+		const int isld_steps_src = islands_precision_src ?
+		                           max_ii((int)(ASTAR_STEPS_MAX * islands_precision_src + 0.499f), 1) : 0;
 
 		float (*poly_nors_src)[3] = NULL;
 		float (*loop_nors_src)[3] = NULL;
@@ -1398,9 +1400,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			 *     of locale vars. Not worth sending all that through parameters (for now at least). */
 			{
 				BLI_AStarGraph *as_graph = NULL;
-				int *poly_isld_index_map = NULL;
+				int *poly_island_index_map = NULL;
 				int pidx_src_prev = -1;
 
+				MeshElemMap *best_island = NULL;
 				float best_island_fac = 0.0f;
 				int best_island_index = -1;
 
@@ -1419,8 +1422,9 @@ void BKE_mesh_remap_calc_loops_from_dm(
 				}
 
 				if (best_island_index != -1 && isld_steps_src) {
+					best_island = island_store.islands[best_island_index];
 					as_graph = &as_graphdata[best_island_index];
-					poly_isld_index_map = (int *)as_graph->custom_data;
+					poly_island_index_map = (int *)as_graph->custom_data;
 					BLI_astar_solution_init(as_graph, &as_solution, false);
 				}
 
@@ -1445,7 +1449,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							/* If prev and curr poly are the same, no need to do anything more!!! */
 							if (!ELEM(pidx_src_prev, -1, pidx_src) && isld_steps_src) {
 								BLI_astar_graph_solve(
-								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
+								        as_graph, poly_island_index_map[pidx_src_prev], poly_island_index_map[pidx_src],
 								        mesh_remap_calc_loops_astar_f_cost, &as_solution, isld_steps_src);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
@@ -1455,20 +1459,20 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									 * but this is one more level of complexity, better to first see if
 									 * simple solution works!
 									 */
-									int pisld_idx_src = poly_isld_index_map[pidx_src];
-									int last_valid_pisld_idx_src = -1;
+									int pidx_isld_src = poly_island_index_map[pidx_src];
+									int last_valid_pidx_isld_src = -1;
 									/* Note we go backward here, from dest to src poly. */
 									for (i = as_solution.steps - 1; i--;) {
-										BLI_AStarGNLink *as_link = as_solution.prev_links[pisld_idx_src];
-										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
-										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
-										BLI_assert(pisld_idx_src != -1);
+										BLI_AStarGNLink *as_link = as_solution.prev_links[pidx_isld_src];
+										const int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
+										pidx_isld_src = as_solution.prev_nodes[pidx_isld_src];
+										BLI_assert(pidx_isld_src != -1);
 										if (eidx != -1) {
 											/* we are 'crossing' a cutting edge. */
-											last_valid_pisld_idx_src = pisld_idx_src;
+											last_valid_pidx_isld_src = pidx_isld_src;
 										}
 									}
-									if (last_valid_pisld_idx_src != -1) {
+									if (last_valid_pidx_isld_src != -1) {
 										/* Find a new valid loop in that new poly (nearest one for now).
 										 * Note we could be much more subtle here, again that's for later... */
 										MPoly *mp_src;
@@ -1484,7 +1488,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 											BLI_space_transform_apply(space_transform, tmp_co);
 										}
 
-										pidx_src = island_store.islands[best_island_index]->indices[last_valid_pisld_idx_src];
+										pidx_src = best_island->indices[last_valid_pidx_isld_src];
 										mp_src = &polys_src[pidx_src];
 										ml_src = &loops_src[mp_src->loopstart];
 										for (j = 0; j < mp_src->totloop; j++, ml_src++) {
@@ -1521,7 +1525,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							/* If prev and curr poly are the same, no need to do anything more!!! */
 							if (!ELEM(pidx_src_prev, -1, pidx_src) && isld_steps_src) {
 								BLI_astar_graph_solve(
-								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
+								        as_graph, poly_island_index_map[pidx_src_prev], poly_island_index_map[pidx_src],
 								        mesh_remap_calc_loops_astar_f_cost, &as_solution, isld_steps_src);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
 									/* Find first 'cutting edge' on path, and bring back lidx_src on poly just
@@ -1531,21 +1535,21 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									 * but this is one more level of complexity, better to first see if
 									 * simple solution works!
 									 */
-									int pisld_idx_src = poly_isld_index_map[pidx_src];
-									int last_valid_pisld_idx_src = -1;
+									int pidx_isld_src = poly_island_index_map[pidx_src];
+									int last_valid_pidx_isld_src = -1;
 									/* Note we go backward here, from dest to src poly. */
 									for (i = as_solution.steps - 1; i--;) {
-										BLI_AStarGNLink *as_link = as_solution.prev_links[pisld_idx_src];
+										BLI_AStarGNLink *as_link = as_solution.prev_links[pidx_isld_src];
 										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
 
-										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
-										BLI_assert(pisld_idx_src != -1);
+										pidx_isld_src = as_solution.prev_nodes[pidx_isld_src];
+										BLI_assert(pidx_isld_src != -1);
 										if (eidx != -1) {
 											/* we are 'crossing' a cutting edge. */
-											last_valid_pisld_idx_src = pisld_idx_src;
+											last_valid_pidx_isld_src = pidx_isld_src;
 										}
 									}
-									if (last_valid_pisld_idx_src != -1) {
+									if (last_valid_pidx_isld_src != -1) {
 										/* Find a new valid loop in that new poly (nearest point on poly for now).
 										 * Note we could be much more subtle here, again that's for later... */
 										MLoop *ml_dst = &loops_dst[lidx_dst];
@@ -1560,9 +1564,10 @@ void BKE_mesh_remap_calc_loops_from_dm(
 											BLI_space_transform_apply(space_transform, tmp_co);
 										}
 
-										pidx_src = island_store.islands[best_island_index]->indices[last_valid_pisld_idx_src];
+										pidx_src = best_island->indices[last_valid_pidx_isld_src];
 										mp_src = &polys_src[pidx_src];
 
+										/* Create that one on demand. */
 										if (poly_to_tessface_map_src == NULL) {
 											BKE_mesh_origindex_map_create(
 											        &poly_to_tessface_map_src, &poly_to_tessface_map_src_buff,
