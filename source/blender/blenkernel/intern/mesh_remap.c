@@ -32,8 +32,8 @@
 
 #include "BLI_utildefines.h"
 #include "BLI_alloca.h"
+#include "BLI_astar.h"
 #include "BLI_bitmap.h"
-#include "BLI_heap.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_memarena.h"
@@ -777,231 +777,12 @@ void BKE_mesh_remap_calc_edges_from_dm(
 	}
 }
 
-typedef struct AStarPathLink {
-	int nodes[2];
-	float cost;
-
-	void *custom_data;
-} AStarPathLink;
-
-typedef struct AStarPathNode {
-	ListBase neighbor_links;
-
-	void *custom_data;
-} AStarPathNode;
-
-typedef struct AStarPathGraph {
-	int node_num;
-	AStarPathNode *nodes;
-
-	void *custom_data;
-
-	struct MemArena *mem;  /* Memory arena. */
-} AStarPathGraph;
-
-typedef struct AStarPathSolution {
-	/* Final 'most useful' data. */
-	int steps;  /* Number of steps (i.e. walked links) in path (nodes num, including start and end, is steps + 1). */
-	int *prev_nodes;  /* Store the path, in reversed order (from destination to source node), as indices. */
-	AStarPathLink **prev_links;  /* Indices are nodes' ones, as prev_nodes, but they map to relevant link. */
-
-	void *custom_data;
-
-	/* Mostly runtime data. */
-	BLI_bitmap *done_nodes;
-	float *g_costs;
-	int *g_steps;
-
-	struct MemArena *mem;  /* Memory arena. */
-} AStarPathSolution;
-
-typedef float (*astar_f_cost)(AStarPathGraph *as_graph, AStarPathSolution *as_solution, AStarPathLink *link,
-                              const int node_idx_curr, const int node_idx_next, const int node_idx_dst);
-
-static void astar_path_graph_init(AStarPathGraph *as_graph, const int node_num, void *custom_data)
-{
-	MemArena *mem = as_graph->mem;
-
-	if (mem == NULL) {
-		mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
-		as_graph->mem = mem;
-	}
-	/* else memarena should be cleared */
-
-	as_graph->node_num = node_num;
-	as_graph->nodes = BLI_memarena_calloc(mem, sizeof(*as_graph->nodes) * (size_t)node_num);
-
-	as_graph->custom_data = custom_data;
-}
-
-static void astar_path_graph_free(AStarPathGraph *as_graph)
-{
-	if (as_graph->mem) {
-		BLI_memarena_free(as_graph->mem);
-		as_graph->mem = NULL;
-	}
-}
-
-static void astar_path_node_init(AStarPathGraph *as_graph, const int node_index, void *custom_data)
-{
-	as_graph->nodes[node_index].custom_data = custom_data;
-}
-
-static void astar_path_node_link_add(
-        AStarPathGraph *as_graph, const int node1_index, const int node2_index, const float cost, void *custom_data)
-{
-	MemArena *mem = as_graph->mem;
-	AStarPathLink *link = BLI_memarena_alloc(mem, sizeof(*link));
-	LinkData *ld = BLI_memarena_alloc(mem, sizeof(*ld) * 2);
-
-	link->nodes[0] = node1_index;
-	link->nodes[1] = node2_index;
-	link->cost = cost;
-	link->custom_data = custom_data;
-
-	ld[0].data = ld[1].data = link;
-
-	BLI_addtail(&(as_graph->nodes[node1_index].neighbor_links), &ld[0]);
-	BLI_addtail(&(as_graph->nodes[node2_index].neighbor_links), &ld[1]);
-}
-
-static int astar_path_node_link_other_node(AStarPathLink *lnk, const int idx)
-{
-	return (lnk->nodes[0] == idx) ? lnk->nodes[1] : lnk->nodes[0];
-}
-
-static void astar_path_solution_init(AStarPathGraph *as_graph, AStarPathSolution *as_solution, void *custom_data)
-{
-	MemArena *mem = as_solution->mem;
-	size_t node_num = (size_t)as_graph->node_num;
-
-	if (mem == NULL) {
-		mem = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
-		as_solution->mem = mem;
-	}
-	/* else memarena should be cleared */
-
-	as_solution->steps = 0;
-	as_solution->prev_nodes = BLI_memarena_alloc(mem, sizeof(*as_solution->prev_nodes) * node_num);
-	as_solution->prev_links = BLI_memarena_alloc(mem, sizeof(*as_solution->prev_links) * node_num);
-
-	as_solution->custom_data = custom_data;
-
-	as_solution->done_nodes = BLI_BITMAP_NEW_MEMARENA(mem, node_num);
-	as_solution->g_costs = BLI_memarena_alloc(mem, sizeof(*as_solution->g_costs) * node_num);
-	as_solution->g_steps = BLI_memarena_alloc(mem, sizeof(*as_solution->g_steps) * node_num);
-}
-
-static void astar_path_solution_clear(AStarPathSolution *as_solution)
-{
-	if (as_solution->mem) {
-		BLI_memarena_clear(as_solution->mem);
-	}
-
-	as_solution->steps = 0;
-	as_solution->prev_nodes = NULL;
-	as_solution->prev_links = NULL;
-
-	as_solution->custom_data = NULL;
-
-	as_solution->done_nodes = NULL;
-	as_solution->g_costs = NULL;
-	as_solution->g_steps = NULL;
-}
-
-static void astar_path_solution_free(AStarPathSolution *as_solution)
-{
-	if (as_solution->mem) {
-		BLI_memarena_free(as_solution->mem);
-		as_solution->mem = NULL;
-	}
-}
-
-static bool astar_path_solve(
-        AStarPathGraph *as_graph, const int node_index_src, const int node_index_dst, astar_f_cost f_cost_cb,
-        AStarPathSolution *r_solution, const int max_steps)
-{
-	Heap *todo_nodes;
-
-	BLI_bitmap *done_nodes = r_solution->done_nodes;
-	int *prev_nodes = r_solution->prev_nodes;
-	AStarPathLink **prev_links = r_solution->prev_links;
-	float *g_costs = r_solution->g_costs;
-	int *g_steps = r_solution->g_steps;
-
-	r_solution->steps = 0;
-	prev_nodes[node_index_src] = -1;
-	BLI_BITMAP_SET_ALL(done_nodes, false, as_graph->node_num);
-	fill_vn_fl(g_costs, as_graph->node_num, FLT_MAX);
-	g_costs[node_index_src] = 0.0f;
-	g_steps[node_index_src] = 0;
-
-	if (node_index_src == node_index_dst) {
-		return true;
-	}
-
-	todo_nodes = BLI_heap_new();
-	BLI_heap_insert(todo_nodes,
-	                f_cost_cb(as_graph, r_solution, NULL, -1, node_index_src, node_index_dst),
-	                SET_INT_IN_POINTER(node_index_src));
-
-	while (!BLI_heap_is_empty(todo_nodes)) {
-		const int node_curr_idx = GET_INT_FROM_POINTER(BLI_heap_popmin(todo_nodes));
-		AStarPathNode *node_curr = &as_graph->nodes[node_curr_idx];
-		LinkData *ld;
-
-		if (BLI_BITMAP_TEST(done_nodes, node_curr_idx)) {
-			/* Might happen, because we always add nodes to heap when evaluating them, without ever removing them. */
-			continue;
-		}
-
-		/* If we are limited in amount of steps to find a path, skip if we reached limit. */
-		if (max_steps && g_steps[node_curr_idx] > max_steps) {
-			continue;
-		}
-
-		if (node_curr_idx == node_index_dst) {
-			/* Success! Path found... */
-			r_solution->steps = g_steps[node_curr_idx] + 1;
-
-			BLI_heap_free(todo_nodes, NULL);
-			return true;
-		}
-
-		BLI_BITMAP_ENABLE(done_nodes, node_curr_idx);
-
-		for (ld = node_curr->neighbor_links.first; ld; ld = ld->next) {
-			AStarPathLink *link = ld->data;
-			const int node_next_idx = astar_path_node_link_other_node(link, node_curr_idx);
-
-			if (!BLI_BITMAP_TEST(done_nodes, node_next_idx)) {
-				float g_cst = g_costs[node_curr_idx] + link->cost;
-
-				if (g_cst < g_costs[node_next_idx]) {
-					prev_nodes[node_next_idx] = node_curr_idx;
-					prev_links[node_next_idx] = link;
-					g_costs[node_next_idx] = g_cst;
-					g_steps[node_next_idx] = g_steps[node_curr_idx] + 1;
-					/* We might have this node already in heap, but since this 'instance' will be evaluated first,
-					 * no problem. */
-					BLI_heap_insert(todo_nodes,
-					                f_cost_cb(as_graph, r_solution, link, node_curr_idx, node_next_idx, node_index_dst),
-					                SET_INT_IN_POINTER(node_next_idx));
-				}
-			}
-		}
-	}
-
-	BLI_heap_free(todo_nodes, NULL);
-	return false;
-}
-
 #define POLY_UNSET       0
 #define POLY_CENTER_INIT 1
 #define POLY_COMPLETE    2
 
-static void mesh_island_to_astar_path_graph_edge_process(
-        MeshIslandStore *islands, const int island_index, AStarPathGraph *as_graph,
+static void mesh_island_to_astar_graph_edge_process(
+        MeshIslandStore *islands, const int island_index, BLI_AStarGraph *as_graph,
         MVert *verts, MPoly *polys, MLoop *loops,
         const int edge_idx, BLI_bitmap *done_edges, MeshElemMap *edge_to_poly_map, const bool is_einnercut,
         int *poly_isld_index_map, float (*poly_centers)[3], unsigned char *poly_status)
@@ -1028,7 +809,7 @@ static void mesh_island_to_astar_path_graph_edge_process(
 
 		if (poly_status[p_isld_idx] == POLY_UNSET) {
 			BKE_mesh_calc_poly_center(mp, &loops[mp->loopstart], verts, poly_centers[p_isld_idx]);
-			astar_path_node_init(as_graph, p_isld_idx, poly_centers[p_isld_idx]);
+			BLI_astar_node_init(as_graph, p_isld_idx, poly_centers[p_isld_idx]);
 			poly_status[p_isld_idx] = POLY_CENTER_INIT;
 		}
 
@@ -1041,7 +822,7 @@ static void mesh_island_to_astar_path_graph_edge_process(
 				continue;
 			}
 			dist_cost = len_v3v3(poly_centers[p_isld_idx_other], poly_centers[p_isld_idx]);
-			astar_path_node_link_add(as_graph, p_isld_idx_other, p_isld_idx, dist_cost, custom_data);
+			BLI_astar_node_link_add(as_graph, p_isld_idx_other, p_isld_idx, dist_cost, custom_data);
 		}
 
 		p_isld_indices[i] = p_isld_idx;
@@ -1050,10 +831,10 @@ static void mesh_island_to_astar_path_graph_edge_process(
 	BLI_BITMAP_ENABLE(done_edges, edge_idx);
 }
 
-static void mesh_island_to_astar_path_graph(
+static void mesh_island_to_astar_graph(
         MeshIslandStore *islands, const int island_index,
         MVert *verts, MeshElemMap *edge_to_poly_map, const int numedges, MLoop *loops, MPoly *polys, const int numpolys,
-        AStarPathGraph *r_as_graph)
+        BLI_AStarGraph *r_as_graph)
 {
 	MeshElemMap *island_poly_map = islands ? islands->islands[island_index] : NULL;
 	MeshElemMap *island_einnercut_map = islands ? islands->innercuts[island_index] : NULL;
@@ -1068,7 +849,7 @@ static void mesh_island_to_astar_path_graph(
 	int p_isld_idx;
 	int i;
 
-	astar_path_graph_init(r_as_graph, node_num, NULL);
+	BLI_astar_graph_init(r_as_graph, node_num, NULL);
 	/* poly_centers is owned by graph memarena. */
 	poly_centers = BLI_memarena_calloc(r_as_graph->mem, sizeof(*poly_centers) * (size_t)node_num);
 
@@ -1082,7 +863,7 @@ static void mesh_island_to_astar_path_graph(
 		r_as_graph->custom_data = poly_isld_index_map;
 
 		for (i = island_einnercut_map->count; i--;) {
-			mesh_island_to_astar_path_graph_edge_process(
+			mesh_island_to_astar_graph_edge_process(
 			        islands, island_index, r_as_graph, verts, polys, loops,
 			        island_einnercut_map->indices[i], done_edges, edge_to_poly_map, true,
 			        poly_isld_index_map, poly_centers, poly_status);
@@ -1105,7 +886,7 @@ static void mesh_island_to_astar_path_graph(
 				continue;
 			}
 
-			mesh_island_to_astar_path_graph_edge_process(
+			mesh_island_to_astar_graph_edge_process(
 			        islands, island_index, r_as_graph, verts, polys, loops,
 			        (int)ml->e, done_edges, edge_to_poly_map, false,
 			        poly_isld_index_map, poly_centers, poly_status);
@@ -1124,7 +905,7 @@ static void mesh_island_to_astar_path_graph(
 /* Our 'f_cost' callback func, to find shortest poly-path between two remapped-loops.
  * Note we do not want to make innercuts 'walls' here, just detect when the shortest path goes by those. */
 static float mesh_remap_calc_loops_astar_f_cost(
-        AStarPathGraph *as_graph, AStarPathSolution *as_solution, AStarPathLink *link,
+        BLI_AStarGraph *as_graph, BLI_AStarSolution *as_solution, BLI_AStarGNLink *link,
         const int node_idx_curr, const int node_idx_next, const int node_idx_dst)
 {
 	float *co_next, *co_dest;
@@ -1186,8 +967,8 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		MeshIslandStore island_store = {0};
 		bool use_islands = false;
 
-		AStarPathGraph *as_graphdata = NULL;
-		AStarPathSolution as_solution = {0};
+		BLI_AStarGraph *as_graphdata = NULL;
+		BLI_AStarSolution as_solution = {0};
 
 		float (*poly_nors_src)[3] = NULL;
 		float (*loop_nors_src)[3] = NULL;
@@ -1353,7 +1134,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		/* Build our AStar graphs. */
 		if (isld_steps_src) {
 			for (tindex = 0; tindex < num_trees; tindex++) {
-				mesh_island_to_astar_path_graph(
+				mesh_island_to_astar_graph(
 				        use_islands ? &island_store : NULL, tindex, verts_src, edge_to_poly_map_src, num_edges_src,
 				        loops_src, polys_src, num_polys_src, &as_graphdata[tindex]);
 			}
@@ -1617,7 +1398,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			/* XXX This block in itself is big and complex enough to be a separate function but... it uses a bunch
 			 *     of locale vars. Not worth sending all that through parameters (for now at least). */
 			{
-				AStarPathGraph *as_graph = NULL;
+				BLI_AStarGraph *as_graph = NULL;
 				int *poly_isld_index_map = NULL;
 				int pidx_src_prev = -1;
 
@@ -1641,7 +1422,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 				if (best_island_index != -1 && isld_steps_src) {
 					as_graph = &as_graphdata[best_island_index];
 					poly_isld_index_map = (int *)as_graph->custom_data;
-					astar_path_solution_init(as_graph, &as_solution, false);
+					BLI_astar_solution_init(as_graph, &as_solution, false);
 				}
 
 				for (plidx_dst = 0; plidx_dst < mp_dst->totloop; plidx_dst++) {
@@ -1664,7 +1445,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 							pidx_src = loop_to_poly_map_src[lidx_src];
 							/* If prev and curr poly are the same, no need to do anything more!!! */
 							if (!ELEM(pidx_src_prev, -1, pidx_src) && isld_steps_src) {
-								astar_path_solve(
+								BLI_astar_graph_solve(
 								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
 								        mesh_remap_calc_loops_astar_f_cost, &as_solution, isld_steps_src);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
@@ -1679,7 +1460,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									int last_valid_pisld_idx_src = -1;
 									/* Note we go backward here, from dest to src poly. */
 									for (i = as_solution.steps - 1; i--;) {
-										AStarPathLink *as_link = as_solution.prev_links[pisld_idx_src];
+										BLI_AStarGNLink *as_link = as_solution.prev_links[pisld_idx_src];
 										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
 										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
 										BLI_assert(pisld_idx_src != -1);
@@ -1740,7 +1521,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 
 							/* If prev and curr poly are the same, no need to do anything more!!! */
 							if (!ELEM(pidx_src_prev, -1, pidx_src) && isld_steps_src) {
-								astar_path_solve(
+								BLI_astar_graph_solve(
 								        as_graph, poly_isld_index_map[pidx_src_prev], poly_isld_index_map[pidx_src],
 								        mesh_remap_calc_loops_astar_f_cost, &as_solution, isld_steps_src);
 								if (GET_INT_FROM_POINTER(as_solution.custom_data) && (as_solution.steps > 0)) {
@@ -1755,7 +1536,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 									int last_valid_pisld_idx_src = -1;
 									/* Note we go backward here, from dest to src poly. */
 									for (i = as_solution.steps - 1; i--;) {
-										AStarPathLink *as_link = as_solution.prev_links[pisld_idx_src];
+										BLI_AStarGNLink *as_link = as_solution.prev_links[pisld_idx_src];
 										int eidx = GET_INT_FROM_POINTER(as_link->custom_data);
 
 										pisld_idx_src = as_solution.prev_nodes[pisld_idx_src];
@@ -1849,7 +1630,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 					}
 				}
 
-				astar_path_solution_clear(&as_solution);
+				BLI_astar_solution_clear(&as_solution);
 			}
 		}
 
@@ -1857,7 +1638,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 			MEM_freeN(islands_res[tindex]);
 			free_bvhtree_from_mesh(&treedata[tindex]);
 			if (isld_steps_src) {
-				astar_path_graph_free(&as_graphdata[tindex]);
+				BLI_astar_graph_free(&as_graphdata[tindex]);
 			}
 		}
 		MEM_freeN(islands_res);
@@ -1865,7 +1646,7 @@ void BKE_mesh_remap_calc_loops_from_dm(
 		MEM_freeN(treedata);
 		if (isld_steps_src) {
 			MEM_freeN(as_graphdata);
-			astar_path_solution_free(&as_solution);
+			BLI_astar_solution_free(&as_solution);
 		}
 
 		if (verts_allocated_src) {
