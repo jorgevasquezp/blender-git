@@ -34,7 +34,6 @@
 #include "BLI_alloca.h"
 #include "BLI_astar.h"
 #include "BLI_bitmap.h"
-#include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_memarena.h"
 #include "BLI_polyfill2d.h"

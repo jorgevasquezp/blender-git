@@ -37,10 +37,13 @@
  * in finding optimal path.
  *
  * Implementation based on Wikipedia A* page [http://TODO_add_the_link.org]!
+ *
+ * Note that most memory handling here is done through two different MemArena's. Those should also be used to allocate
+ * custom data needed to a specific use of A*.
+ * The first one, owned by BLI_AStarGraph, is for 'static' data that will live as long as the graph.
+ * The second one, owned by BLI_AStarSolution, is for data used during a single path solve. It will be cleared
+ * much more often than graph's one.
  */
-
-//#include <string.h>
-//#include <stdlib.h>
 
 #include <limits.h>
 
@@ -57,14 +60,22 @@
 
 #include "BLI_astar.h"
 
-
-//#include "MEM_guardedalloc.h"
-
+/**
+ * Init a node in A* graph.
+ *
+ * \param custom_data an opaque pointer attached to this link, available e.g. to cost callback function.
+ */
 void BLI_astar_node_init(BLI_AStarGraph *as_graph, const int node_index, void *custom_data)
 {
 	as_graph->nodes[node_index].custom_data = custom_data;
 }
 
+/**
+ * Add a link between to nodes of our A* graph.
+ *
+ * \param cost the 'length' of the link (actual distance between two vertices or face centers e.g.).
+ * \param custom_data an opaque pointer attached to this link, available e.g. to cost callback function.
+ */
 void BLI_astar_node_link_add(
         BLI_AStarGraph *as_graph, const int node1_index, const int node2_index, const float cost, void *custom_data)
 {
@@ -83,11 +94,21 @@ void BLI_astar_node_link_add(
 	BLI_addtail(&(as_graph->nodes[node2_index].neighbor_links), &ld[1]);
 }
 
+/**
+ * \return The index of the other node of given link.
+ */
 int BLI_astar_node_link_other_node(BLI_AStarGNLink *lnk, const int idx)
 {
 	return (lnk->nodes[0] == idx) ? lnk->nodes[1] : lnk->nodes[0];
 }
 
+/**
+ * Initialize a solution data for given A* graph. Does not compute anything!
+ *
+ * \param custom_data an opaque pointer attached to this link, available e.g. to cost callback function.
+ *
+ * \note BLI_AStarSolution stores nearly all data needed during solution compute.
+ */
 void BLI_astar_solution_init(BLI_AStarGraph *as_graph, BLI_AStarSolution *as_solution, void *custom_data)
 {
 	MemArena *mem = as_solution->mem;
@@ -110,6 +131,12 @@ void BLI_astar_solution_init(BLI_AStarGraph *as_graph, BLI_AStarSolution *as_sol
 	as_solution->g_steps = BLI_memarena_alloc(mem, sizeof(*as_solution->g_steps) * node_num);
 }
 
+/**
+ * Clear given solution's data, but does not release its memory. Avoids having to recreate/allocate
+ * a memarena in loops, e.g.
+ *
+ * \note This *has to be called* between each path solving.
+ */
 void BLI_astar_solution_clear(BLI_AStarSolution *as_solution)
 {
 	if (as_solution->mem) {
@@ -127,6 +154,9 @@ void BLI_astar_solution_clear(BLI_AStarSolution *as_solution)
 	as_solution->g_steps = NULL;
 }
 
+/**
+ * Release the memory allocated for this solution.
+ */
 void BLI_astar_solution_free(BLI_AStarSolution *as_solution)
 {
 	if (as_solution->mem) {
@@ -135,9 +165,25 @@ void BLI_astar_solution_free(BLI_AStarSolution *as_solution)
 	}
 }
 
+/**
+ * Callback computing the current cost (distance) to next node, and the estimated overall cost to destination node
+ * (A* expects this estimation to always be less or equal than actual shortest path from next node to destination one).
+ *
+ * \param link the graph link between current node and next one.
+ * \param node_idx_curr current node index.
+ * \param node_idx_next next node index.
+ * \param node_idx_dst destination node index.
+ */
 typedef float (*astar_f_cost)(BLI_AStarGraph *as_graph, BLI_AStarSolution *as_solution, BLI_AStarGNLink *link,
                               const int node_idx_curr, const int node_idx_next, const int node_idx_dst);
 
+/**
+ * Init an A* graph. Total number of nodes must be known.
+ *
+ * Nodes might be e.g. vertices, faces, ...
+ *
+ * \param custom_data an opaque pointer attached to this link, available e.g. to cost callback function.
+ */
 void BLI_astar_graph_init(BLI_AStarGraph *as_graph, const int node_num, void *custom_data)
 {
 	MemArena *mem = as_graph->mem;
@@ -162,6 +208,13 @@ void BLI_astar_graph_free(BLI_AStarGraph *as_graph)
 	}
 }
 
+/**
+ * Solve a path in given graph, using given 'cost' callback function.
+ *
+ * \param max_steps maximum number of nodes the found path may have. Useful in performance-critical usages.
+ *                  If no path is found within given steps, returns false too.
+ * \return true if a path was found, false otherwise.
+ */
 bool BLI_astar_graph_solve(
         BLI_AStarGraph *as_graph, const int node_index_src, const int node_index_dst, astar_f_cost f_cost_cb,
         BLI_AStarSolution *r_solution, const int max_steps)
