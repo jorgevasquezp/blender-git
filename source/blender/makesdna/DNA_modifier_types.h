@@ -1383,6 +1383,9 @@ typedef struct DataTransferModifierData {
 
 	float map_max_distance;
 	float map_ray_radius;
+	float islands_precision;
+
+	int pad_i1;
 
 	int layers_select_src[4];  /* DT_MULTILAYER_INDEX_MAX; See DT_FROMLAYERS_ enum in ED_object.h */
 	int layers_select_dst[4];  /* DT_MULTILAYER_INDEX_MAX; See DT_TOLAYERS_ enum in ED_object.h */

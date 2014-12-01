@@ -151,6 +151,8 @@ static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 	return (dtmd->ob_source == NULL);
 }
 
+#define HIGH_POLY_WARNING 10000
+
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *derivedData,
                                   ModifierApplyFlag UNUSED(flag))
 {
@@ -180,6 +182,9 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 
 	if (BKE_reports_contain(&reports, RPT_ERROR)) {
 		modifier_setError(md, "%s", BKE_reports_string(&reports, RPT_ERROR));
+	}
+	else if (dm->getNumVerts(dm) > HIGH_POLY_WARNING || ((Mesh *)(dtmd->ob_source->data))->totvert > HIGH_POLY_WARNING) {
+		modifier_setError(md, "You are using a rather high poly as source or destination, computation might be slow");
 	}
 
 	return dm;

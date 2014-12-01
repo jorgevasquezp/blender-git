@@ -507,7 +507,7 @@ void OBJECT_OT_data_transfer(wmOperatorType *ot)
 	                     "'Width' of rays (especially useful when raycasting against vertices or edges)",
 	                     0.0f, 10.0f);
 	RNA_def_property_subtype(prop, PROP_DISTANCE);
-	prop = RNA_def_float(ot->srna, "islands_precision", 0.1f, 0.0f, 1.0f, "Islands Precision",
+	prop = RNA_def_float(ot->srna, "islands_precision", 0.1f, 0.0f, 10.0f, "Islands Precision",
 	                     "Factor controlling precision of islands handling (the higher, the better the results)",
 	                     0.0f, 1.0f);
 	RNA_def_property_subtype(prop, PROP_FACTOR);

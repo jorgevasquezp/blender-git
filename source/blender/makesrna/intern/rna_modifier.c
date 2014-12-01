@@ -4202,6 +4202,12 @@ static void rna_def_modifier_datatransfer(BlenderRNA *brna)
 	RNA_def_property_subtype(prop, PROP_DISTANCE);
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+	prop = RNA_def_float(srna, "islands_precision", 0.0f, 0.0f, 1.0f, "Islands Handling Refinement",
+	                     "Factor controlling precision of islands handling "
+	                     "(typically, 0.1 should be enough, higher values can make things really slow)", 0.0f, 1.0f);
+	RNA_def_property_subtype(prop, PROP_DISTANCE);
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
 	/* How to handle multi-layers types of data. */
 	prop = RNA_def_enum(srna, "layers_vgroup_select_src", DT_layers_select_src_items, DT_LAYERS_ALL_SRC,
 	                    "Source Layers Selection", "Which layers to transfer, in case of multi-layers types");

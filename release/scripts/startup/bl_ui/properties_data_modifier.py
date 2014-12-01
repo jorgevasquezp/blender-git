@@ -1294,6 +1294,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             row.prop(md, "layers_uv_select_src", text="")
             row.label(icon='RIGHTARROW')
             row.prop(md, "layers_uv_select_dst", text="")
+            col.prop(md, "islands_precision")
 
         layout.separator()
 
@@ -1330,7 +1331,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "mix_factor")
 
         col = split.column()
-        col.operator("object.datalayout_transfer", text="Generate Data Layers")
+        row = col.row()
+        row.active = bool(md.object)
+        row.operator("object.datalayout_transfer", text="Generate Data Layers")
         row = col.row(align=True)
         row.prop_search(md, "vertex_group", ob, "vertex_groups", text="")
         sub = row.row(align=True)
