@@ -554,6 +554,10 @@ static int datalayout_transfer_exec(bContext *C, wmOperator *op)
 
 		const bool use_delete = false;  /* Never when used from modifier, for now. */
 
+		if (!ob_src) {
+			return OPERATOR_CANCELLED;
+		}
+
 		BKE_object_data_transfer_layout(scene, ob_src, ob_dst, dtmd->data_types, use_delete,
 		                                dtmd->layers_select_src, dtmd->layers_select_dst);
 	}
