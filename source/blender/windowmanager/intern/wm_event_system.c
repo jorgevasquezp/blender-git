@@ -3378,7 +3378,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 		{
 			event.val = KM_PRESS;
 			win->ime_data = customdata;
-			win->ime_data->is_ime_composite = true;
+			win->ime_data->is_ime_composing = true;
 			event.type = WM_IME_COMPOSITE_START;
 			wm_event_add(win, &event);
 			break;
@@ -3393,7 +3393,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 		case GHOST_kEventImeCompositionEnd:
 		{
 			event.val = KM_PRESS;
-			win->ime_data->is_ime_composite = false;
+			win->ime_data->is_ime_composing = false;
 			event.type = WM_IME_COMPOSITE_END;
 			wm_event_add(win, &event);
 			break;

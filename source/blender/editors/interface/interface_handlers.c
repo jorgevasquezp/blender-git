@@ -2636,7 +2636,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 
 	wmWindow *win = CTX_wm_window(C);
 	wmIMEData *ime_data = win->ime_data;
-	bool is_ime_composing = ime_data && ime_data->is_ime_composite;
+	bool is_ime_composing = ime_data && ime_data->is_ime_composing;
 
 	switch (event->type) {
 		case MOUSEMOVE:
@@ -2887,7 +2887,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 			ui_textedit_delete_selection(but, data);
 		if (event->type == WM_IME_COMPOSITE_EVENT && ime_data->result_len)
 			ui_textedit_type_buf(but, data,
-								 ime_data->result,
+			                     ime_data->str_result,
 								 ime_data->result_len);
 	}
 	else if (event->type == WM_IME_COMPOSITE_END) {

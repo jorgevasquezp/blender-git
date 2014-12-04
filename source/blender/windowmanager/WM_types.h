@@ -470,23 +470,6 @@ typedef struct wmTabletData {
 	float Ytilt;		/* as above */
 } wmTabletData;
 
-/* similar to GHOST_TEventImeData */
-/* XXX - names, comments */
-typedef struct wmIMEData {
-	size_t result_len, composite_len;
-
-	char *result;           /* utf8 encoding */
-	char *composite;        /* utf8 encoding */
-
-	int cursor_position;    /* cursor position in the IME composition. */
-	int target_start;       /* position of the beginning of the selection */
-	int target_end;         /* position of the end of the selection */
-	int cursor_xy[2];       /* text cursor position */
-	int cursor_pos_text;    /* cursor pos in text (console space only) */
-	
-	bool is_ime_composite;  /* for uiBut only */
-} wmIMEData;
-
 typedef enum {  /* motion progress, for modal handlers */
 	P_NOT_STARTED,
 	P_STARTING,    /* <-- */
@@ -586,6 +569,22 @@ typedef struct wmOperatorType {
 	short flag;
 
 } wmOperatorType;
+
+/* *********** Input Method Editor (IME) *********** */
+
+/* similar to GHOST_TEventImeData */
+typedef struct wmIMEData {
+	size_t result_len, composite_len;
+
+	char *str_result;           /* utf8 encoding */
+	char *str_composite;        /* utf8 encoding */
+
+	int cursor_pos;             /* cursor position in the IME composition. */
+	int sel_start;              /* beginning of the selection */
+	int sel_end;                /* end of the selection */
+
+	bool is_ime_composing;
+} wmIMEData;
 
 /* **************** Paint Cursor ******************* */
 

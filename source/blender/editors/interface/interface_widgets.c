@@ -1241,7 +1241,7 @@ static void widget_draw_text_ime_underline(uiFontStyle *fstyle, uiWidgetColors *
 {
 	int ofs_x, width;
 	int rect_x = BLI_rcti_size_x(rect);
-	int target_start = ime_data->target_start, target_end = ime_data->target_end;
+	int sel_start = ime_data->sel_start, sel_end = ime_data->sel_end;
 
 	if (drawstr[0] != 0) {
 		if (but->pos >= but->ofs) {
@@ -1258,19 +1258,19 @@ static void widget_draw_text_ime_underline(uiFontStyle *fstyle, uiWidgetColors *
 		UI_text_draw_underline(rect->xmin + ofs_x, rect->ymin + 6 * U.pixelsize, min_ii(width, rect_x - 2) - ofs_x, 1);
 
 		/* draw the thick line */
-		if (target_start != -1 && target_end != -1) {
-			target_end -= target_start;
-			target_start += but->pos;
+		if (sel_start != -1 && sel_end != -1) {
+			sel_end -= sel_start;
+			sel_start += but->pos;
 
-			if (target_start >= but->ofs) {
-				ofs_x = BLF_width(fstyle->uifont_id, drawstr + but->ofs, target_start - but->ofs);
+			if (sel_start >= but->ofs) {
+				ofs_x = BLF_width(fstyle->uifont_id, drawstr + but->ofs, sel_start - but->ofs);
 			}
 			else {
 				ofs_x = 0;
 			}
 
 			width = BLF_width(fstyle->uifont_id, drawstr + but->ofs,
-			                  target_end + target_start - but->ofs);
+			                  sel_end + sel_start - but->ofs);
 
 			UI_text_draw_underline(rect->xmin + ofs_x, rect->ymin + 6 * U.pixelsize, min_ii(width, rect_x - 2) - ofs_x, 2);
 		}
@@ -1321,7 +1321,7 @@ static void widget_draw_text(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *b
 			if (ime_data && ime_data->composite_len) {
 				/* insert composite string into cursor pos */
 				BLI_snprintf(drawstr, UI_MAX_DRAW_STR, "%s%s%s",
-				             but->editstr, ime_data->composite,
+				             but->editstr, ime_data->str_composite,
 				             but->editstr + but->pos);
 			}
 			else
@@ -1364,8 +1364,8 @@ static void widget_draw_text(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *b
 
 #ifdef WITH_INPUT_IME
 		/* if is ime compositing, move the cursor */
-		if (ime_data && ime_data->composite_len && ime_data->cursor_position != -1) {
-			vpos += ime_data->cursor_position;
+		if (ime_data && ime_data->composite_len && ime_data->cursor_pos != -1) {
+			vpos += ime_data->cursor_pos;
 		}
 #endif
 
