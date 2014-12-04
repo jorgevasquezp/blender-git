@@ -191,7 +191,7 @@ typedef struct wmWindow {
 	short last_pie_event;      /* exception to the above rule for nested pies, store last pie event for operators
 	                            * that spawn a new pie right after destruction of last pie */
 
-	struct wmImeData *ime_data;   /* Input Method Editor data - complex character input (esp. for asian character input) */
+	struct wmIMEData *ime_data;   /* Input Method Editor data - complex character input (esp. for asian character input) */
 
 	struct wmEvent *eventstate;   /* storage for event system */
 

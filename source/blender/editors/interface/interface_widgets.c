@@ -1237,7 +1237,7 @@ static void ui_text_clip_right_label(uiFontStyle *fstyle, uiBut *but, const rcti
 }
 
 #ifdef WITH_INPUT_IME
-static void widget_draw_text_ime_underline(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *but, rcti *rect, wmImeData *ime_data, char *drawstr)
+static void widget_draw_text_ime_underline(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *but, rcti *rect, wmIMEData *ime_data, char *drawstr)
 {
 	int ofs_x, width;
 	int rect_x = BLI_rcti_size_x(rect);
@@ -1285,7 +1285,7 @@ static void widget_draw_text(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *b
 	const char *drawstr_right = NULL;
 	char *drawstr_edit = NULL;
 	bool use_right_only = false;
-	wmImeData *ime_data;
+	wmIMEData *ime_data;
 
 	UI_fontstyle_set(fstyle);
 	

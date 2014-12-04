@@ -472,7 +472,7 @@ typedef struct wmTabletData {
 
 /* similar to GHOST_TEventImeData */
 /* XXX - names, comments */
-typedef struct wmImeData {
+typedef struct wmIMEData {
 	size_t result_len, composite_len;
 
 	char *result;           /* utf8 encoding */
@@ -485,7 +485,7 @@ typedef struct wmImeData {
 	int cursor_pos_text;    /* cursor pos in text (console space only) */
 	
 	bool is_ime_composite;  /* for uiBut only */
-} wmImeData;
+} wmIMEData;
 
 typedef enum {  /* motion progress, for modal handlers */
 	P_NOT_STARTED,

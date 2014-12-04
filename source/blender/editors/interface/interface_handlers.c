@@ -2456,7 +2456,7 @@ void ui_but_ime_reposition(uiBut *but, int x, int y, int complete)
 }
 
 /* should be ui_but_ime_data_get */
-wmImeData *ui_but_get_ime_data(uiBut *but) 
+wmIMEData *ui_but_get_ime_data(uiBut *but)
 {
 	if (but->active && but->active->window)
 		return but->active->window->ime_data;
@@ -2635,7 +2635,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 	bool changed = false, inbox = false, update = false;
 
 	wmWindow *win = CTX_wm_window(C);
-	wmImeData *ime_data = win->ime_data;
+	wmIMEData *ime_data = win->ime_data;
 	bool is_ime_composing = ime_data && ime_data->is_ime_composite;
 
 	switch (event->type) {
